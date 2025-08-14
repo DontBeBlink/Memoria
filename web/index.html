@@ -106,11 +106,13 @@
     const suggestBtn = document.getElementById('suggest');
     const planList = document.getElementById('planList');
 
-    let PASS = localStorage.getItem('memoria_pass') || '';
-    passEl.value = PASS;
+  let PASS = localStorage.getItem('memoria_pass') || '';
+  // Expose PASS globally so `web/js/dictation.js` can read it (it checks window.PASS)
+  window.PASS = PASS;
+  passEl.value = PASS;
     const authWarning = document.getElementById('authWarning');
 
-    savePassBtn.onclick = () => { PASS = passEl.value.trim(); localStorage.setItem('memoria_pass', PASS); alert('Passcode set locally'); };
+  savePassBtn.onclick = () => { PASS = passEl.value.trim(); window.PASS = PASS; localStorage.setItem('memoria_pass', PASS); alert('Passcode set locally'); };
 
     async function api(path, method='GET', body=null) {
       const res = await fetch(API + path, {
