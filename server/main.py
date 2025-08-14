@@ -142,11 +142,22 @@ async def transcribe_audio(audio: UploadFile = File(...), auth=Depends(require_a
         try:
             # Initialize Whisper model (this will be cached)
             if not hasattr(transcribe_audio, '_whisper_model'):
-                transcribe_audio._whisper_model = WhisperModel(
-                    WHISPER_MODEL, 
-                    device=WHISPER_DEVICE, 
-                    compute_type="auto"
-                )
+                try:
+                    transcribe_audio._whisper_model = WhisperModel(
+                        WHISPER_MODEL, 
+                        device=WHISPER_DEVICE, 
+                        compute_type="auto",
+                        local_files_only=False  # Allow downloading models
+                    )
+                except Exception as model_error:
+                    # Provide helpful error message if model can't be loaded
+                    error_msg = str(model_error)
+                    if "internet connection" in error_msg.lower() or "network" in error_msg.lower():
+                        raise HTTPException(status_code=500, detail="Cannot download Whisper model. Please check internet connection and try again.")
+                    elif "local_files_only" in error_msg:
+                        raise HTTPException(status_code=500, detail="Whisper model not found. Please ensure internet connection for first-time model download.")
+                    else:
+                        raise HTTPException(status_code=500, detail=f"Failed to initialize Whisper model: {error_msg}")
             
             model = transcribe_audio._whisper_model
             
@@ -168,10 +179,14 @@ async def transcribe_audio(audio: UploadFile = File(...), auth=Depends(require_a
             
         finally:
             # Clean up the temporary file
-            os.unlink(tmp_file_path)
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
             
     except ImportError:
-        raise HTTPException(status_code=500, detail="Speech recognition not available. Install voice dependencies.")
+        raise HTTPException(status_code=500, detail="Speech recognition not available. Install voice dependencies with: pip install -r requirements-voice.txt")
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
