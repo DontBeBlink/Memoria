@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Memoria Backup</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b1220; color:#e5e7eb; }
+    header { padding:12px 16px; background:#111827; position:sticky; top:0; display:flex; align-items:center; gap:12px; }
+    h1 { margin:0; font-size:18px; }
+    main { padding:16px; max-width:840px; margin: 0 auto; }
+    section { margin-bottom: 24px; }
+    .card { border:1px solid #374151; border-radius:8px; padding:20px; background:#0f172a; }
+    button { padding:12px 20px; border:0; border-radius:8px; background:#2563eb; color:white; font-size:14px; cursor:pointer; }
+    button:hover { background:#1d4ed8; }
+    button:disabled { background:#374151; cursor:not-allowed; }
+    .button-secondary { background:#059669; }
+    .button-secondary:hover { background:#047857; }
+    input[type=file] { margin:8px 0; }
+    input[type=checkbox] { margin-right:8px; }
+    .muted { color:#9ca3af; font-size:14px; margin-top:8px; }
+    .result { padding:12px; border-radius:6px; margin-top:12px; }
+    .result.success { background:#065f46; border:1px solid #059669; }
+    .result.error { background:#7f1d1d; border:1px solid #dc2626; }
+    .row { display:flex; gap:8px; align-items:center; }
+    a { color:#60a5fa; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .auth-warning { background:#dc2626; color:white; padding:12px 16px; display:none; border-left:4px solid #b91c1c; }
+    .auth-warning.show { display:block; }
+    .stats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+    .stat { background:#1f2937; padding:8px 12px; border-radius:6px; }
+    .stat-label { font-size:12px; color:#9ca3af; }
+    .stat-value { font-size:16px; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><a href="/">Memoria Hub</a> / Backup</h1>
+    <div class="row">
+      <input id="pass" type="text" placeholder="Passcode" style="max-width:160px; padding:8px; border-radius:6px; border:1px solid #374151; background:#0f172a; color:#e5e7eb;"/>
+      <button id="savePass">Set</button>
+    </div>
+  </header>
+  <div id="authWarning" class="auth-warning">
+    <strong>Unauthorized!</strong> Please set your Passcode to match the AUTH_TOKEN from your .env file.
+  </div>
+  <main>
+    <section>
+      <div class="card">
+        <h3>Export Data</h3>
+        <p class="muted">Download all your memories and tasks as a JSON file for backup.</p>
+        <button id="exportBtn">📥 Download Backup</button>
+        <div id="exportResult"></div>
+      </div>
+    </section>
+    
+    <section>
+      <div class="card">
+        <h3>Import Data</h3>
+        <p class="muted">Upload a JSON backup file to restore your memories and tasks.</p>
+        <input type="file" id="importFile" accept=".json" />
+        <div class="row">
+          <label><input type="checkbox" id="overwriteFlag" /> Overwrite existing items</label>
+        </div>
+        <p class="muted">If "Overwrite existing items" is unchecked, duplicate IDs will be skipped.</p>
+        <button id="importBtn" disabled class="button-secondary">📤 Import Backup</button>
+        <div id="importResult"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API = window.location.origin;
+    const passEl = document.getElementById('pass');
+    const savePassBtn = document.getElementById('savePass');
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const importFile = document.getElementById('importFile');
+    const overwriteFlag = document.getElementById('overwriteFlag');
+    const authWarning = document.getElementById('authWarning');
+
+    let PASS = localStorage.getItem('memoria_pass') || '';
+    passEl.value = PASS;
+
+    savePassBtn.onclick = () => {
+      PASS = passEl.value.trim();
+      localStorage.setItem('memoria_pass', PASS);
+      alert('Passcode set locally');
+    };
+
+    async function api(path, method='GET', body=null) {
+      const res = await fetch(API + path, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(PASS ? {'x-auth-token': PASS} : {})
+        },
+        body: body ? JSON.stringify(body) : null
+      });
+      
+      if (res.status === 401) {
+        authWarning.classList.add('show');
+        throw new Error('Unauthorized');
+      } else {
+        authWarning.classList.remove('show');
+      }
+      
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    // Export functionality
+    exportBtn.onclick = async () => {
+      const resultDiv = document.getElementById('exportResult');
+      resultDiv.innerHTML = '';
+      exportBtn.disabled = true;
+      exportBtn.textContent = '⏳ Exporting...';
+
+      try {
+        const data = await api('/export');
+        
+        // Create and download file
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `memoria-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        resultDiv.innerHTML = `
+          <div class="result success">
+            ✅ Backup downloaded successfully!<br>
+            <small>${data.memories.length} memories, ${data.tasks.length} tasks</small>
+          </div>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <div class="result error">
+            ❌ Export failed: ${error.message}
+          </div>
+        `;
+      } finally {
+        exportBtn.disabled = false;
+        exportBtn.textContent = '📥 Download Backup';
+      }
+    };
+
+    // Import functionality
+    importFile.onchange = () => {
+      importBtn.disabled = !importFile.files.length;
+    };
+
+    importBtn.onclick = async () => {
+      const file = importFile.files[0];
+      if (!file) return;
+
+      const resultDiv = document.getElementById('importResult');
+      resultDiv.innerHTML = '';
+      importBtn.disabled = true;
+      importBtn.textContent = '⏳ Importing...';
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        const overwrite = overwriteFlag.checked;
+        const result = await api(`/import?overwrite=${overwrite}`, 'POST', data);
+
+        const totalMemories = result.memories.inserted + result.memories.updated + result.memories.skipped + result.memories.failed;
+        const totalTasks = result.tasks.inserted + result.tasks.updated + result.tasks.skipped + result.tasks.failed;
+
+        resultDiv.innerHTML = `
+          <div class="result success">
+            ✅ Import completed!
+            <div class="stats">
+              <div class="stat">
+                <div class="stat-label">Memories</div>
+                <div class="stat-value">${totalMemories} total</div>
+                <div class="muted">
+                  ${result.memories.inserted} inserted, 
+                  ${result.memories.updated} updated, 
+                  ${result.memories.skipped} skipped, 
+                  ${result.memories.failed} failed
+                </div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Tasks</div>
+                <div class="stat-value">${totalTasks} total</div>
+                <div class="muted">
+                  ${result.tasks.inserted} inserted, 
+                  ${result.tasks.updated} updated, 
+                  ${result.tasks.skipped} skipped, 
+                  ${result.tasks.failed} failed
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <div class="result error">
+            ❌ Import failed: ${error.message}
+          </div>
+        `;
+      } finally {
+        importBtn.disabled = false;
+        importBtn.textContent = '📤 Import Backup';
+      }
+    };
+  </script>
+</body>
+</html>

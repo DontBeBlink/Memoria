@@ -132,6 +132,95 @@ def set_notified(task_id: int, when_iso: str):
   conn.commit()
   conn.close()
 
+def import_memory(memory_data: Dict[str, Any], overwrite: bool = False) -> Dict[str, str]:
+  """Import a memory with specific ID. Returns status dict."""
+  conn = _connect()
+  cur = conn.cursor()
+  
+  # Check if memory with this ID already exists
+  existing = cur.execute("SELECT id FROM memories WHERE id=?", (memory_data['id'],)).fetchone()
+  
+  if existing and not overwrite:
+    conn.close()
+    return {"status": "skipped", "reason": "duplicate_id"}
+  
+  try:
+    if existing and overwrite:
+      # Update existing memory
+      cur.execute("""UPDATE memories 
+                     SET text=?, created=?, tags=? 
+                     WHERE id=?""", 
+                  (memory_data['text'], memory_data['created'], 
+                   memory_data.get('tags', ''), memory_data['id']))
+      conn.commit()
+      conn.close()
+      return {"status": "updated"}
+    else:
+      # Insert new memory with specific ID
+      cur.execute("""INSERT INTO memories(id, text, created, tags) 
+                     VALUES (?, ?, ?, ?)""",
+                  (memory_data['id'], memory_data['text'], 
+                   memory_data['created'], memory_data.get('tags', '')))
+      conn.commit()
+      conn.close()
+      return {"status": "inserted"}
+  except Exception as e:
+    conn.close()
+    return {"status": "failed", "reason": str(e)}
+
+def import_task(task_data: Dict[str, Any], overwrite: bool = False) -> Dict[str, str]:
+  """Import a task with specific ID. Returns status dict."""
+  conn = _connect()
+  cur = conn.cursor()
+  
+  # Check if task with this ID already exists
+  existing = cur.execute("SELECT id FROM tasks WHERE id=?", (task_data['id'],)).fetchone()
+  
+  if existing and not overwrite:
+    conn.close()
+    return {"status": "skipped", "reason": "duplicate_id"}
+  
+  try:
+    if existing and overwrite:
+      # Update existing task
+      cur.execute("""UPDATE tasks 
+                     SET title=?, due=?, done=?, created=?, tags=?, notified_at=?
+                     WHERE id=?""", 
+                  (task_data['title'], task_data.get('due'), 
+                   task_data.get('done', 0), task_data['created'],
+                   task_data.get('tags', ''), task_data.get('notified_at'),
+                   task_data['id']))
+      conn.commit()
+      conn.close()
+      return {"status": "updated"}
+    else:
+      # Insert new task with specific ID
+      cur.execute("""INSERT INTO tasks(id, title, due, done, created, tags, notified_at) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                  (task_data['id'], task_data['title'], task_data.get('due'),
+                   task_data.get('done', 0), task_data['created'],
+                   task_data.get('tags', ''), task_data.get('notified_at')))
+      conn.commit()
+      conn.close()
+      return {"status": "inserted"}
+  except Exception as e:
+    conn.close()
+    return {"status": "failed", "reason": str(e)}
+
+def get_all_memories():
+  """Get all memories without limit for export."""
+  conn = _connect()
+  rows = conn.execute("SELECT * FROM memories ORDER BY id ASC").fetchall()
+  conn.close()
+  return [dict(r) for r in rows]
+
+def get_all_tasks():
+  """Get all tasks without limit for export."""
+  conn = _connect()
+  rows = conn.execute("SELECT * FROM tasks ORDER BY id ASC").fetchall()
+  conn.close()
+  return [dict(r) for r in rows]
+
 def delete_memory(memory_id: int) -> bool:
   conn = _connect()
   cur = conn.cursor()

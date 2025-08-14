@@ -128,6 +128,62 @@ The web interface includes a built-in voice dictation feature:
 - Respects AUTH_TOKEN authentication
 - Visual feedback during recording and transcription
 
+## Backup and Data Migration
+Memoria includes backup functionality to export and import your data:
+
+### Export Data
+- Visit the **Backup** page from the header link
+- Click "Download Backup" to export all memories and tasks as JSON
+- File format: `{"memories": [...], "tasks": [...]}`
+
+### Import Data
+- Use the same Backup page to upload a JSON backup file
+- Choose "Overwrite existing items" to update records with same IDs
+- Leave unchecked to skip duplicates (safer option)
+- Import reports show counts of inserted/updated/skipped/failed records
+
+### API Endpoints
+- `GET /export` - Returns JSON with all memories and tasks
+- `POST /import?overwrite=false` - Imports JSON data, accepts overwrite flag
+
+### Use Cases
+- **Backup**: Regular exports for data safety
+- **Migration**: Move data between instances
+- **Testing**: Delete database, import backup to restore
+=======
+## Deleting memories and tasks
+
+Each memory and task has a trash icon (🗑️) button for deletion:
+- Click the delete button to get a confirmation dialog
+- Deleted items are permanently removed (hard delete)
+- API returns 404 for unknown IDs; UI shows "Item already gone" message
+- Works with keyboard navigation (Tab to focus, Enter/Space to activate)
+
+## Web-based voice dictation
+
+The web interface includes a built-in voice dictation feature:
+
+- **🎤 Mic button** in the header for voice recording
+- **Hold-to-record**: Press and hold the mic button to record, release to stop and transcribe
+- **Automatic memory creation**: Transcribed text is automatically saved as a memory
+- **Error handling**: Shows clear error messages for permission issues or transcription failures
+
+**Setup:**
+1. Install voice dependencies: `pip install -r requirements-voice.txt`
+2. Configure in `.env`:
+   ```bash
+   WHISPER_MODEL=small.en          # Base, small, medium, large-v3, etc.
+   TRANSCRIPTION_LANGUAGE=en       # Language code or 'auto'
+   WHISPER_DEVICE=cpu              # 'cpu' or 'cuda' (if GPU available)
+   ```
+3. Grant microphone permission when prompted
+
+**Features:**
+- Works on Chrome/Edge (Windows) and Chrome (macOS)
+- Offline transcription using faster-whisper
+- Respects AUTH_TOKEN authentication
+- Visual feedback during recording and transcription
+
 ## Don’t commit secrets/data
 - Keep `.env` and `server/app.db` out of git (already in `.gitignore`).
 - Commit `.env.example` only.

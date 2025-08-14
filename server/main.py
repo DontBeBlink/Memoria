@@ -5,15 +5,16 @@ import tempfile
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 
-from fastapi import FastAPI, Depends, HTTPException, Header, File, UploadFile
+from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import requests
 
 from . import storage
 from .schemas import MemoryIn, MemoryPatch, TaskIn, TaskPatch, CaptureIn, TranscriptionResponse
+import json
 
 load_dotenv()
 
@@ -184,6 +185,40 @@ def capture(data: CaptureIn, auth=Depends(require_auth)):
   else:
     row = storage.add_memory(parsed["text"])
     return {"type": "memory", "item": row}
+
+@app.get("/export")
+def export_data(auth=Depends(require_auth)):
+  """Export all memories and tasks as JSON."""
+  memories = storage.get_all_memories()
+  tasks = storage.get_all_tasks()
+  return {"memories": memories, "tasks": tasks}
+
+@app.post("/import")
+def import_data(data: dict, overwrite: bool = False, auth=Depends(require_auth)):
+  """Import memories and tasks from JSON. Returns counts of operations."""
+  if not isinstance(data, dict) or "memories" not in data or "tasks" not in data:
+    raise HTTPException(status_code=400, detail="Invalid data format. Expected {memories: [...], tasks: [...]}")
+  
+  results = {
+    "memories": {"inserted": 0, "updated": 0, "skipped": 0, "failed": 0},
+    "tasks": {"inserted": 0, "updated": 0, "skipped": 0, "failed": 0}
+  }
+  
+  # Import memories
+  for memory in data.get("memories", []):
+    result = storage.import_memory(memory, overwrite=overwrite)
+    status = result["status"]
+    if status in results["memories"]:
+      results["memories"][status] += 1
+  
+  # Import tasks
+  for task in data.get("tasks", []):
+    result = storage.import_task(task, overwrite=overwrite)
+    status = result["status"]
+    if status in results["tasks"]:
+      results["tasks"][status] += 1
+  
+  return results
 
 @app.post("/transcribe", response_model=TranscriptionResponse)
 async def transcribe_audio(audio: UploadFile = File(...), auth=Depends(require_auth)):
