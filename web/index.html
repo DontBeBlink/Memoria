@@ -22,7 +22,24 @@
     .muted { color:#9ca3af; font-size:12px; }
     ul { list-style:none; padding:0; margin:0; display:grid; gap:8px; }
     li { border:1px solid #374151; border-radius:8px; padding:10px 12px; background:#0f172a; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    li.editing { border-color:#2563eb; }
+    li.unsaved { border-color:#f59e0b; }
     .row { display:flex; gap:8px; align-items:center; }
+    .edit-icon { 
+      background:none; border:none; color:#9ca3af; cursor:pointer; padding:4px; border-radius:4px;
+      display:inline-flex; align-items:center; justify-content:center; font-size:14px;
+    }
+    .edit-icon:hover { background:#374151; color:#e5e7eb; }
+    .edit-actions { display:flex; gap:4px; }
+    .edit-actions button { padding:4px 8px; font-size:12px; }
+    .save-btn { background:#059669; }
+    .cancel-btn { background:#dc2626; }
+    .inline-input { 
+      background:#1f2937; border:1px solid #374151; color:#e5e7eb; padding:6px 8px; 
+      border-radius:4px; font-size:14px; width:100%; min-width:200px;
+    }
+    .inline-input:focus { outline:none; border-color:#2563eb; }
+    .error-message { color:#ef4444; font-size:12px; margin-top:4px; }
     .tags { color:#9ca3af; font-size:12px; }
     .pill { background:#1f2937; color:#e5e7eb; border-radius:999px; padding:4px 8px; font-size:12px; }
     .sec-title { display:flex; justify-content:space-between; align-items:center; }
@@ -133,10 +150,33 @@
       el.innerHTML = '';
       for (const it of items) {
         const li = document.createElement('li');
-        const left = document.createElement('div'); left.className = 'row';
-        const title = document.createElement('div'); title.textContent = (it.text || it.title);
-        const tags = document.createElement('div'); tags.className = 'tags'; tags.textContent = it.tags || '';
-        left.append(title, tags);
+        li.dataset.id = it.id;
+        li.dataset.type = type;
+        
+        const left = document.createElement('div'); 
+        left.className = 'row';
+        left.style.flex = '1';
+        
+        const contentContainer = document.createElement('div');
+        contentContainer.style.flex = '1';
+        
+        const title = document.createElement('div'); 
+        title.textContent = (it.text || it.title);
+        title.className = 'content-text';
+        
+        const tags = document.createElement('div'); 
+        tags.className = 'tags'; 
+        tags.textContent = it.tags || '';
+        
+        contentContainer.append(title, tags);
+        
+        const editIcon = document.createElement('button');
+        editIcon.className = 'edit-icon';
+        editIcon.innerHTML = '✏️';
+        editIcon.title = 'Edit';
+        editIcon.onclick = () => startEdit(li, type, it);
+        
+        left.append(contentContainer, editIcon);
         li.append(left);
         el.appendChild(li);
       }
@@ -146,17 +186,175 @@
       taskList.innerHTML = '';
       for (const t of tasks) {
         const li = document.createElement('li');
-        const left = document.createElement('div'); left.className = 'row';
-        const title = document.createElement('div'); title.textContent = t.title;
-        const meta = document.createElement('div'); meta.className = 'tags'; meta.textContent = (t.due ? new Date(t.due).toLocaleString() : '') + (t.tags?' '+t.tags:'');
-        left.append(title, meta);
-        const right = document.createElement('div'); right.className = 'row';
-        const doneBtn = document.createElement('button'); doneBtn.className = 'pill'; doneBtn.textContent = 'Done';
-        doneBtn.onclick = async () => { await api(`/tasks/${t.id}/done?done=true`, 'POST'); await loadAll(); };
+        li.dataset.id = t.id;
+        li.dataset.type = 'task';
+        
+        const left = document.createElement('div'); 
+        left.className = 'row';
+        left.style.flex = '1';
+        
+        const contentContainer = document.createElement('div');
+        contentContainer.style.flex = '1';
+        
+        const title = document.createElement('div'); 
+        title.textContent = t.title;
+        title.className = 'content-text';
+        
+        const meta = document.createElement('div'); 
+        meta.className = 'tags'; 
+        meta.textContent = (t.due ? new Date(t.due).toLocaleString() : '') + (t.tags?' '+t.tags:'');
+        
+        contentContainer.append(title, meta);
+        
+        const editIcon = document.createElement('button');
+        editIcon.className = 'edit-icon';
+        editIcon.innerHTML = '✏️';
+        editIcon.title = 'Edit';
+        editIcon.onclick = () => startEdit(li, 'task', t);
+        
+        left.append(contentContainer, editIcon);
+        
+        const right = document.createElement('div'); 
+        right.className = 'row';
+        const doneBtn = document.createElement('button'); 
+        doneBtn.className = 'pill'; 
+        doneBtn.textContent = 'Done';
+        doneBtn.onclick = async () => { 
+          await api(`/tasks/${t.id}/done?done=true`, 'POST'); 
+          await loadAll(); 
+        };
         right.append(doneBtn);
+        
         li.append(left, right);
         taskList.appendChild(li);
       }
+    }
+
+    function startEdit(li, type, item) {
+      if (li.classList.contains('editing')) return;
+      
+      li.classList.add('editing');
+      const contentText = li.querySelector('.content-text');
+      const originalText = contentText.textContent;
+      
+      // Store original data for cancel
+      li.dataset.originalText = originalText;
+      
+      // Create input field
+      const input = document.createElement('input');
+      input.className = 'inline-input';
+      input.type = 'text';
+      input.value = originalText;
+      
+      // Create action buttons
+      const actions = document.createElement('div');
+      actions.className = 'edit-actions';
+      
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'save-btn';
+      saveBtn.textContent = '✓';
+      saveBtn.title = 'Save';
+      saveBtn.onclick = () => saveEdit(li, type, item.id, input.value);
+      
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'cancel-btn';
+      cancelBtn.textContent = '✕';
+      cancelBtn.title = 'Cancel';
+      cancelBtn.onclick = () => cancelEdit(li);
+      
+      actions.append(saveBtn, cancelBtn);
+      
+      // Replace content with input and actions
+      contentText.style.display = 'none';
+      contentText.parentNode.insertBefore(input, contentText);
+      contentText.parentNode.insertBefore(actions, contentText.nextSibling);
+      
+      // Hide edit icon
+      li.querySelector('.edit-icon').style.display = 'none';
+      
+      // Focus input and select text
+      input.focus();
+      input.select();
+      
+      // Handle Enter key
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          saveEdit(li, type, item.id, input.value);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelEdit(li);
+        }
+      };
+      
+      // Mark as unsaved when typing
+      input.oninput = () => {
+        if (input.value !== originalText) {
+          li.classList.add('unsaved');
+        } else {
+          li.classList.remove('unsaved');
+        }
+      };
+    }
+    
+    async function saveEdit(li, type, id, newText) {
+      if (!newText.trim()) {
+        showError(li, 'Text cannot be empty');
+        return;
+      }
+      
+      try {
+        const endpoint = type === 'memory' ? `/memories/${id}` : `/tasks/${id}`;
+        const field = type === 'memory' ? 'text' : 'title';
+        const payload = { [field]: newText.trim() };
+        
+        await api(endpoint, 'PATCH', payload);
+        finishEdit(li, true);
+        await loadAll();
+      } catch (error) {
+        showError(li, error.message);
+      }
+    }
+    
+    function cancelEdit(li) {
+      finishEdit(li, false);
+    }
+    
+    function finishEdit(li, success) {
+      li.classList.remove('editing', 'unsaved');
+      
+      // Remove input and actions
+      const input = li.querySelector('.inline-input');
+      const actions = li.querySelector('.edit-actions');
+      const errorMsg = li.querySelector('.error-message');
+      
+      if (input) input.remove();
+      if (actions) actions.remove();
+      if (errorMsg) errorMsg.remove();
+      
+      // Show content and edit icon again
+      const contentText = li.querySelector('.content-text');
+      const editIcon = li.querySelector('.edit-icon');
+      
+      contentText.style.display = '';
+      editIcon.style.display = '';
+      
+      // Clean up data attributes
+      delete li.dataset.originalText;
+    }
+    
+    function showError(li, message) {
+      // Remove existing error
+      const existingError = li.querySelector('.error-message');
+      if (existingError) existingError.remove();
+      
+      // Add new error message
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error-message';
+      errorDiv.textContent = message;
+      
+      const actions = li.querySelector('.edit-actions');
+      actions.parentNode.insertBefore(errorDiv, actions.nextSibling);
     }
 
     memForm.onsubmit = async (e) => {
@@ -199,13 +397,44 @@
       planList.innerHTML = '';
       for (const t of items) {
         const li = document.createElement('li');
-        const left = document.createElement('div'); left.className='row';
-        const title = document.createElement('div'); title.textContent = t.title;
-        const meta = document.createElement('div'); meta.className='tags'; meta.textContent = (t.due? new Date(t.due).toLocaleString(): '') + (t.tags?' '+t.tags:'');
-        left.append(title, meta);
-        const right = document.createElement('div'); right.className='row';
-        const doneBtn = document.createElement('button'); doneBtn.className='pill'; doneBtn.textContent='Done';
-        doneBtn.onclick = async ()=>{ await api(`/tasks/${t.id}/done?done=true`, 'POST'); await loadAll(); suggestBtn.click(); };
+        li.dataset.id = t.id;
+        li.dataset.type = 'task';
+        
+        const left = document.createElement('div'); 
+        left.className='row';
+        left.style.flex = '1';
+        
+        const contentContainer = document.createElement('div');
+        contentContainer.style.flex = '1';
+        
+        const title = document.createElement('div'); 
+        title.textContent = t.title;
+        title.className = 'content-text';
+        
+        const meta = document.createElement('div'); 
+        meta.className='tags'; 
+        meta.textContent = (t.due? new Date(t.due).toLocaleString(): '') + (t.tags?' '+t.tags:'');
+        
+        contentContainer.append(title, meta);
+        
+        const editIcon = document.createElement('button');
+        editIcon.className = 'edit-icon';
+        editIcon.innerHTML = '✏️';
+        editIcon.title = 'Edit';
+        editIcon.onclick = () => startEdit(li, 'task', t);
+        
+        left.append(contentContainer, editIcon);
+        
+        const right = document.createElement('div'); 
+        right.className='row';
+        const doneBtn = document.createElement('button'); 
+        doneBtn.className='pill'; 
+        doneBtn.textContent='Done';
+        doneBtn.onclick = async ()=>{ 
+          await api(`/tasks/${t.id}/done?done=true`, 'POST'); 
+          await loadAll(); 
+          suggestBtn.click(); 
+        };
         right.append(doneBtn);
         li.append(left, right);
         planList.appendChild(li);
