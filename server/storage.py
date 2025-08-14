@@ -104,3 +104,21 @@ def set_notified(task_id: int, when_iso: str):
   conn.execute("UPDATE tasks SET notified_at=? WHERE id=?", (when_iso, task_id))
   conn.commit()
   conn.close()
+
+def delete_memory(memory_id: int) -> bool:
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("DELETE FROM memories WHERE id=?", (memory_id,))
+  deleted = cur.rowcount > 0
+  conn.commit()
+  conn.close()
+  return deleted
+
+def delete_task(task_id: int) -> bool:
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+  deleted = cur.rowcount > 0
+  conn.commit()
+  conn.close()
+  return deleted
