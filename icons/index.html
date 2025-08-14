@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Memoria Icon Exporter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { margin: 0; font-family: system-ui; background: #0b1220; color: #e5e7eb; padding: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .card { border: 1px solid #374151; border-radius: 8px; padding: 16px; background: #0f172a; }
+    .preview { width: 100px; height: 100px; margin: 10px auto; border: 1px solid #374151; }
+    button { padding: 8px 16px; border: 0; border-radius: 6px; background: #2563eb; color: white; margin: 4px; }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Memoria Icon Exporter</h1>
+  <p>Generate PNG icons for PWA from SVG sources. Right-click to save generated images.</p>
+  
+  <div class="grid">
+    <div class="card">
+      <h3>Memoria (Memory)</h3>
+      <div class="preview" id="memoria-preview"></div>
+      <button onclick="exportIcon('memoria', 192)">192px PNG</button>
+      <button onclick="exportIcon('memoria', 512)">512px PNG</button>
+    </div>
+    
+    <div class="card">
+      <h3>Promemoria (Reminder)</h3>
+      <div class="preview" id="promemoria-preview"></div>
+      <button onclick="exportIcon('promemoria', 192)">192px PNG</button>
+      <button onclick="exportIcon('promemoria', 512)">512px PNG</button>
+    </div>
+    
+    <div class="card">
+      <h3>Agenda (Planning)</h3>
+      <div class="preview" id="agenda-preview"></div>
+      <button onclick="exportIcon('agenda', 192)">192px PNG</button>
+      <button onclick="exportIcon('agenda', 512)">512px PNG</button>
+    </div>
+    
+    <div class="card">
+      <h3>Focus (Concentration)</h3>
+      <div class="preview" id="focus-preview"></div>
+      <button onclick="exportIcon('focus', 192)">192px PNG</button>
+      <button onclick="exportIcon('focus', 512)">512px PNG</button>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const svgSources = {
+      memoria: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="#3b82f6">
+        <circle cx="128" cy="128" r="100" fill="#0f172a" stroke="#3b82f6" stroke-width="8"/>
+        <path d="M80 100h96v16H80zm0 24h96v16H80zm0 24h64v16H80z" fill="#3b82f6"/>
+        <circle cx="200" cy="80" r="12" fill="#10b981"/>
+      </svg>`,
+      promemoria: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="#f59e0b">
+        <circle cx="128" cy="128" r="100" fill="#0f172a" stroke="#f59e0b" stroke-width="8"/>
+        <path d="M100 90h56v16H100zm0 24h72v16H100zm0 24h48v16H100z" fill="#f59e0b"/>
+        <path d="M180 120l20 20-20 20v-12h-24v-16h24v-12z" fill="#f59e0b"/>
+        <circle cx="80" cy="80" r="8" fill="#ef4444"/>
+      </svg>`,
+      agenda: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="#8b5cf6">
+        <circle cx="128" cy="128" r="100" fill="#0f172a" stroke="#8b5cf6" stroke-width="8"/>
+        <path d="M80 80h96v16H80zm0 24h96v12H80zm0 20h72v12H80zm0 20h56v12H80zm0 20h80v12H80z" fill="#8b5cf6"/>
+        <circle cx="200" cy="100" r="6" fill="#06d6a0"/>
+        <circle cx="190" cy="120" r="6" fill="#ffd166"/>
+        <circle cx="180" cy="140" r="6" fill="#ef476f"/>
+      </svg>`,
+      focus: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="#06d6a0">
+        <circle cx="128" cy="128" r="100" fill="#0f172a" stroke="#06d6a0" stroke-width="8"/>
+        <circle cx="128" cy="128" r="60" fill="none" stroke="#06d6a0" stroke-width="6"/>
+        <circle cx="128" cy="128" r="30" fill="none" stroke="#06d6a0" stroke-width="4"/>
+        <circle cx="128" cy="128" r="8" fill="#06d6a0"/>
+        <path d="M128 68v20M128 168v20M188 128h-20M68 128h20" stroke="#06d6a0" stroke-width="3"/>
+      </svg>`
+    };
+
+    // Show previews
+    Object.keys(svgSources).forEach(name => {
+      document.getElementById(name + '-preview').innerHTML = svgSources[name];
+    });
+
+    function exportIcon(name, size) {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = size;
+      canvas.height = size;
+
+      const img = new Image();
+      const svgBlob = new Blob([svgSources[name]], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = function() {
+        ctx.drawImage(img, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+        
+        canvas.toBlob(function(blob) {
+          const link = document.createElement('a');
+          link.download = `${name}-${size}.png`;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+          URL.revokeObjectURL(link.href);
+        });
+      };
+      
+      img.src = url;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+import sqlite3
+from typing import List, Optional, Any, Dict
+import os
+from datetime import datetime
+
+DB_PATH = os.path.join(os.path.dirname(__file__), "app.db")
+
+def _connect():
+  conn = sqlite3.connect(DB_PATH)
+  conn.row_factory = sqlite3.Row
+  return conn
+
+def init_db():
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("""
+  CREATE TABLE IF NOT EXISTS memories(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    created TEXT NOT NULL,
+    tags TEXT DEFAULT ''
+  )""")
+  cur.execute("""
+  CREATE TABLE IF NOT EXISTS tasks(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    due TEXT,
+    done INTEGER NOT NULL DEFAULT 0,
+    created TEXT NOT NULL,
+    tags TEXT DEFAULT '',
+    notified_at TEXT
+  )""")
+  conn.commit()
+  conn.close()
+
+def _tags_from(text: str) -> str:
+  import re
+  ats = re.findall(r'@\w+', text) or []
+  hashes = re.findall(r'#\w+', text) or []
+  tags = list(dict.fromkeys(ats + hashes))
+  return " ".join(tags)
+
+def add_memory(text: str) -> Dict[str, Any]:
+  created = datetime.utcnow().isoformat()
+  tags = _tags_from(text)
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("INSERT INTO memories(text, created, tags) VALUES (?, ?, ?)", (text, created, tags))
+  mem_id = cur.lastrowid
+  conn.commit()
+  row = cur.execute("SELECT * FROM memories WHERE id=?", (mem_id,)).fetchone()
+  conn.close()
+  return dict(row)
+
+def add_task(title: str, due: Optional[str]) -> Dict[str, Any]:
+  created = datetime.utcnow().isoformat()
+  tags = _tags_from(title)
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("INSERT INTO tasks(title, due, done, created, tags) VALUES (?, ?, 0, ?, ?)",
+              (title, due, created, tags))
+  task_id = cur.lastrowid
+  conn.commit()
+  row = cur.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+  conn.close()
+  return dict(row)
+
+def list_memories(limit: int = 100):
+  conn = _connect()
+  rows = conn.execute("SELECT * FROM memories ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+  conn.close()
+  return [dict(r) for r in rows]
+
+def list_tasks(open_only: bool = False, limit: int = 200):
+  conn = _connect()
+  if open_only:
+    rows = conn.execute("SELECT * FROM tasks WHERE done=0 ORDER BY COALESCE(due, '9999') ASC, id DESC LIMIT ?", (limit,)).fetchall()
+  else:
+    rows = conn.execute("SELECT * FROM tasks ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+  conn.close()
+  return [dict(r) for r in rows]
+
+def mark_done(task_id: int, done: bool):
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("UPDATE tasks SET done=? WHERE id=?", (1 if done else 0, task_id))
+  conn.commit()
+  row = cur.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+  conn.close()
+  return dict(row) if row else None
+
+def due_unnotified(now_iso: str):
+  conn = _connect()
+  rows = conn.execute("""
+    SELECT * FROM tasks
+    WHERE done=0 AND due IS NOT NULL
+      AND due <= ? AND (notified_at IS NULL)
+  """, (now_iso,)).fetchall()
+  conn.close()
+  return [dict(r) for r in rows]
+
+def set_notified(task_id: int, when_iso: str):
+  conn = _connect()
+  conn.execute("UPDATE tasks SET notified_at=? WHERE id=?", (when_iso, task_id))
+  conn.commit()
+  conn.close()
