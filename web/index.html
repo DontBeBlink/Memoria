@@ -117,7 +117,79 @@
       }
       
       if (!res.ok) throw new Error(await res.text());
+      
+      // Handle 204 No Content responses
+      if (res.status === 204) {
+        return null;
+      }
+      
       return res.json();
+    }
+
+    async function deleteItem(type, id, listElement) {
+      const itemName = type === 'memory' ? 'memory' : 'task';
+      if (!confirm(`Delete this ${itemName}?`)) {
+        return;
+      }
+      
+      try {
+        const endpoint = type === 'memory' ? `/memories/${id}` : `/tasks/${id}`;
+        await api(endpoint, 'DELETE');
+        
+        // Optimistically remove from UI
+        listElement.remove();
+        
+        // Show success message
+        showMessage(`${itemName.charAt(0).toUpperCase() + itemName.slice(1)} deleted successfully`, 'success');
+      } catch (error) {
+        // Handle different error scenarios
+        if (error.message.includes('Not found')) {
+          showMessage('Item already gone', 'info');
+          listElement.remove(); // Remove from UI anyway since it doesn't exist
+        } else {
+          showMessage(`Failed to delete ${itemName}: ${error.message}`, 'error');
+        }
+      }
+    }
+
+    function showMessage(text, type = 'info') {
+      // Create or reuse message element
+      let messageEl = document.getElementById('messageBar');
+      if (!messageEl) {
+        messageEl = document.createElement('div');
+        messageEl.id = 'messageBar';
+        messageEl.style.cssText = `
+          position: fixed;
+          top: 60px;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 12px 16px;
+          border-radius: 8px;
+          color: white;
+          font-weight: bold;
+          z-index: 1000;
+          max-width: 400px;
+          text-align: center;
+        `;
+        document.body.appendChild(messageEl);
+      }
+      
+      // Set message and style based on type
+      messageEl.textContent = text;
+      if (type === 'success') {
+        messageEl.style.background = '#059669';
+      } else if (type === 'error') {
+        messageEl.style.background = '#dc2626';
+      } else {
+        messageEl.style.background = '#2563eb';
+      }
+      
+      messageEl.style.display = 'block';
+      
+      // Auto-hide after 3 seconds
+      setTimeout(() => {
+        messageEl.style.display = 'none';
+      }, 3000);
     }
 
     async function loadAll() {
@@ -137,7 +209,16 @@
         const title = document.createElement('div'); title.textContent = (it.text || it.title);
         const tags = document.createElement('div'); tags.className = 'tags'; tags.textContent = it.tags || '';
         left.append(title, tags);
-        li.append(left);
+        
+        const right = document.createElement('div'); right.className = 'row';
+        const deleteBtn = document.createElement('button'); 
+        deleteBtn.className = 'pill'; 
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.setAttribute('aria-label', `Delete ${type}`);
+        deleteBtn.onclick = async () => await deleteItem(type, it.id, li);
+        right.append(deleteBtn);
+        
+        li.append(left, right);
         el.appendChild(li);
       }
     }
@@ -153,7 +234,12 @@
         const right = document.createElement('div'); right.className = 'row';
         const doneBtn = document.createElement('button'); doneBtn.className = 'pill'; doneBtn.textContent = 'Done';
         doneBtn.onclick = async () => { await api(`/tasks/${t.id}/done?done=true`, 'POST'); await loadAll(); };
-        right.append(doneBtn);
+        const deleteBtn = document.createElement('button'); 
+        deleteBtn.className = 'pill'; 
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.setAttribute('aria-label', 'Delete task');
+        deleteBtn.onclick = async () => await deleteItem('task', t.id, li);
+        right.append(doneBtn, deleteBtn);
         li.append(left, right);
         taskList.appendChild(li);
       }
@@ -206,7 +292,12 @@
         const right = document.createElement('div'); right.className='row';
         const doneBtn = document.createElement('button'); doneBtn.className='pill'; doneBtn.textContent='Done';
         doneBtn.onclick = async ()=>{ await api(`/tasks/${t.id}/done?done=true`, 'POST'); await loadAll(); suggestBtn.click(); };
-        right.append(doneBtn);
+        const deleteBtn = document.createElement('button'); 
+        deleteBtn.className = 'pill'; 
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.setAttribute('aria-label', 'Delete task');
+        deleteBtn.onclick = async () => { await deleteItem('task', t.id, li); suggestBtn.click(); };
+        right.append(doneBtn, deleteBtn);
         li.append(left, right);
         planList.appendChild(li);
       }
