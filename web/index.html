@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Memoria Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b1220; color:#e5e7eb; }
+    header { padding:12px 16px; background:#111827; position:sticky; top:0; display:flex; align-items:center; gap:12px; }
+    h1 { margin:0; font-size:18px; }
+    main { padding:16px; max-width:840px; margin: 0 auto; }
+    section { margin-bottom: 20px; }
+    form { display:flex; gap:8px; flex-wrap:wrap; }
+    input[type=text] { flex:1; min-width: 240px; padding:10px; border-radius:8px; border:1px solid #374151; background:#0f172a; color:#e5e7eb; }
+    button, select { padding:10px 12px; border:0; border-radius:8px; background:#2563eb; color:white; }
+    .muted { color:#9ca3af; font-size:12px; }
+    ul { list-style:none; padding:0; margin:0; display:grid; gap:8px; }
+    li { border:1px solid #374151; border-radius:8px; padding:10px 12px; background:#0f172a; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .row { display:flex; gap:8px; align-items:center; }
+    .tags { color:#9ca3af; font-size:12px; }
+    .pill { background:#1f2937; color:#e5e7eb; border-radius:999px; padding:4px 8px; font-size:12px; }
+    .sec-title { display:flex; justify-content:space-between; align-items:center; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Memoria Hub</h1>
+    <div class="row">
+      <input id="pass" type="text" placeholder="Passcode" style="max-width:160px;"/>
+      <button id="savePass">Set</button>
+      <button id="install" style="display:none;">Install App</button>
+      <button id="refresh">Refresh</button>
+    </div>
+  </header>
+  <main>
+    <section class="grid">
+      <div>
+        <div class="sec-title"><h3>Memoria</h3><span class="muted">Capture a memory (@name, #tags)</span></div>
+        <form id="memForm">
+          <input id="memText" type="text" placeholder="@alex likes oolong tea"/>
+          <button type="submit">Save</button>
+        </form>
+        <ul id="memList"></ul>
+      </div>
+      <div>
+        <div class="sec-title"><h3>Promemoria</h3><span class="muted">Natural language times (e.g., tomorrow 9am)</span></div>
+        <form id="taskForm">
+          <input id="taskText" type="text" placeholder="email Sam tomorrow 10am #low"/>
+          <button type="submit">Save</button>
+        </form>
+        <ul id="taskList"></ul>
+      </div>
+    </section>
+    <section>
+      <div class="sec-title"><h3>Agenda</h3><span class="muted">Quick plan</span></div>
+      <div class="row" style="margin-bottom:8px;">
+        <select id="energy">
+          <option value="low">Low</option>
+          <option value="med" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+        <button id="suggest">Suggest</button>
+      </div>
+      <ul id="planList"></ul>
+    </section>
+    <p class="muted">Tip: Add this page to your Home Screen for app-like use. Notifications: use ntfy to get alerts on your phone when tasks are due.</p>
+  </main>
+  <script>
+    const API = (window.location.origin);
+    const passEl = document.getElementById('pass');
+    const savePassBtn = document.getElementById('savePass');
+    const memForm = document.getElementById('memForm');
+    const memText = document.getElementById('memText');
+    const memList = document.getElementById('memList');
+    const taskForm = document.getElementById('taskForm');
+    const taskText = document.getElementById('taskText');
+    const taskList = document.getElementById('taskList');
+    const refreshBtn = document.getElementById('refresh');
+    const energySel = document.getElementById('energy');
+    const suggestBtn = document.getElementById('suggest');
+    const planList = document.getElementById('planList');
+
+    let PASS = localStorage.getItem('memoria_pass') || '';
+    passEl.value = PASS;
+
+    savePassBtn.onclick = () => { PASS = passEl.value.trim(); localStorage.setItem('memoria_pass', PASS); alert('Passcode set locally'); };
+
+    async function api(path, method='GET', body=null) {
+      const res = await fetch(API + path, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(PASS ? {'x-auth-token': PASS} : {})
+        },
+        body: body ? JSON.stringify(body) : null
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    async function loadAll() {
+      const [mems, tasks] = await Promise.all([
+        api('/memories'),
+        api('/tasks?open_only=true')
+      ]);
+      renderList(memList, mems, 'memory');
+      renderTasks(tasks);
+    }
+
+    function renderList(el, items, type) {
+      el.innerHTML = '';
+      for (const it of items) {
+        const li = document.createElement('li');
+        const left = document.createElement('div'); left.className = 'row';
+        const title = document.createElement('div'); title.textContent = (it.text || it.title);
+        const tags = document.createElement('div'); tags.className = 'tags'; tags.textContent = it.tags || '';
+        left.append(title, tags);
+        li.append(left);
+        el.appendChild(li);
+      }
+    }
+
+    function renderTasks(tasks) {
+      taskList.innerHTML = '';
+      for (const t of tasks) {
+        const li = document.createElement('li');
+        const left = document.createElement('div'); left.className = 'row';
+        const title = document.createElement('div'); title.textContent = t.title;
+        const meta = document.createElement('div'); meta.className = 'tags'; meta.textContent = (t.due ? new Date(t.due).toLocaleString() : '') + (t.tags?' '+t.tags:'');
+        left.append(title, meta);
+        const right = document.createElement('div'); right.className = 'row';
+        const doneBtn = document.createElement('button'); doneBtn.className = 'pill'; doneBtn.textContent = 'Done';
+        doneBtn.onclick = async () => { await api(`/tasks/${t.id}/done?done=true`, 'POST'); await loadAll(); };
+        right.append(doneBtn);
+        li.append(left, right);
+        taskList.appendChild(li);
+      }
+    }
+
+    memForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const text = memText.value.trim(); if (!text) return;
+      await api('/memories', 'POST', { text });
+      memText.value = '';
+      await loadAll();
+    };
+
+    taskForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const text = taskText.value.trim(); if (!text) return;
+      await api('/capture', 'POST', { text });
+      taskText.value = '';
+      await loadAll();
+    };
+
+    refreshBtn.onclick = loadAll;
+
+    suggestBtn.onclick = async () => {
+      const tasks = await api('/tasks?open_only=true');
+      const energy = energySel.value;
+      const scored = tasks.map(t => {
+        let score = 0;
+        if ((t.tags||'').includes('#ydt')) score += 3;
+        if (t.due) {
+          const d = new Date(t.due);
+          const hours = (d - new Date())/36e5;
+          if (hours < 0) score += 3;
+          else if (hours < 24) score += 2;
+          else if (hours < 72) score += 1;
+        }
+        const energyTag = (t.tags||'').match(/#(low|med|high)/)?.[1] || 'med';
+        return { t, score, energyTag };
+      });
+      const filtered = scored.filter(o => o.energyTag === energy || (energy==='low' && o.energyTag==='med'));
+      filtered.sort((a,b)=> b.score - a.score);
+      const items = filtered.slice(0,6).map(o=>o.t);
+      planList.innerHTML = '';
+      for (const t of items) {
+        const li = document.createElement('li');
+        const left = document.createElement('div'); left.className='row';
+        const title = document.createElement('div'); title.textContent = t.title;
+        const meta = document.createElement('div'); meta.className='tags'; meta.textContent = (t.due? new Date(t.due).toLocaleString(): '') + (t.tags?' '+t.tags:'');
+        left.append(title, meta);
+        const right = document.createElement('div'); right.className='row';
+        const doneBtn = document.createElement('button'); doneBtn.className='pill'; doneBtn.textContent='Done';
+        doneBtn.onclick = async ()=>{ await api(`/tasks/${t.id}/done?done=true`, 'POST'); await loadAll(); suggestBtn.click(); };
+        right.append(doneBtn);
+        li.append(left, right);
+        planList.appendChild(li);
+      }
+    };
+
+    // PWA install prompt
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.getElementById('install').style.display = 'inline-block'; });
+    document.getElementById('install').onclick = async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('install').style.display = 'none';
+    };
+
+    // Service worker
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
+
+    loadAll().catch(err => alert('Error: ' + err.message));
+  </script>
+</body>
+</html>

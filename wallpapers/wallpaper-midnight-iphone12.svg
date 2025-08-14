@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844" fill="#0f172a">
+  <!-- iPhone 12 wallpaper with midnight theme -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#06d6a0"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="390" height="844" fill="url(#bg)"/>
+  
+  <!-- Subtle pattern -->
+  <g opacity="0.1">
+    <circle cx="100" cy="200" r="40" fill="url(#accent)"/>
+    <circle cx="290" cy="150" r="25" fill="url(#accent)"/>
+    <circle cx="50" cy="400" r="30" fill="url(#accent)"/>
+    <circle cx="340" cy="350" r="35" fill="url(#accent)"/>
+    <circle cx="150" cy="600" r="20" fill="url(#accent)"/>
+    <circle cx="300" cy="700" r="45" fill="url(#accent)"/>
+  </g>
+  
+  <!-- Central focus element -->
+  <g transform="translate(195, 422)">
+    <circle r="80" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.3"/>
+    <circle r="50" fill="none" stroke="url(#accent)" stroke-width="1" opacity="0.5"/>
+    <circle r="8" fill="url(#accent)" opacity="0.8"/>
+  </g>
+  
+  <!-- Memoria branding -->
+  <text x="195" y="550" text-anchor="middle" font-family="system-ui, -apple-system" font-size="24" font-weight="300" fill="#64748b" opacity="0.7">Memoria</text>
+</svg>
