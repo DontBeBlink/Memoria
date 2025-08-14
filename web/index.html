@@ -5,6 +5,7 @@
   <title>Memoria Hub</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -27,6 +28,8 @@
     .sec-title { display:flex; justify-content:space-between; align-items:center; }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
     @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+    .auth-warning { background:#dc2626; color:white; padding:12px 16px; display:none; border-left:4px solid #b91c1c; }
+    .auth-warning.show { display:block; }
   </style>
 </head>
 <body>
@@ -39,6 +42,9 @@
       <button id="refresh">Refresh</button>
     </div>
   </header>
+  <div id="authWarning" class="auth-warning">
+    <strong>Unauthorized!</strong> Please set your Passcode to match the AUTH_TOKEN from your .env file.
+  </div>
   <main>
     <section class="grid">
       <div>
@@ -89,6 +95,7 @@
 
     let PASS = localStorage.getItem('memoria_pass') || '';
     passEl.value = PASS;
+    const authWarning = document.getElementById('authWarning');
 
     savePassBtn.onclick = () => { PASS = passEl.value.trim(); localStorage.setItem('memoria_pass', PASS); alert('Passcode set locally'); };
 
@@ -101,6 +108,14 @@
         },
         body: body ? JSON.stringify(body) : null
       });
+      
+      if (res.status === 401) {
+        authWarning.classList.add('show');
+        throw new Error('Unauthorized');
+      } else {
+        authWarning.classList.remove('show');
+      }
+      
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     }

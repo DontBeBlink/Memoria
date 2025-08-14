@@ -11,8 +11,29 @@ Contents
 - `.env.example` Copy to `.env` and fill values
 - `.github/workflows/pages.yml` Optional: auto-deploy `web/` to Pages
 
-## Run the server (Windows/macOS/Linux)
+## Quick Start (Windows)
 
+**One-line setup with scripts:**
+```powershell
+# Start server (creates venv, installs deps, starts server)
+.\scripts\start-server.ps1
+
+# In another terminal, start dictation (optional)
+.\scripts\start-dictation.ps1
+```
+
+**PowerShell Execution Policy:** If you get a script execution error, run one of these first:
+```powershell
+# Option 1: Allow for current session only (recommended)
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
+# Option 2: Allow for current user permanently
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+```
+
+## Manual Setup (Windows/macOS/Linux)
+
+**Server only (recommended for most users):**
 ```bash
 python -m venv .venv
 # Windows:
@@ -20,10 +41,19 @@ python -m venv .venv
 # macOS/Linux:
 # source .venv/bin/activate
 
-pip install -r requirements.txt
+pip install -r requirements-server.txt
 cp .env.example .env  # then edit AUTH_TOKEN, etc.
 
 uvicorn server.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**With voice dictation (optional):**
+```bash
+# After server setup above, install voice dependencies:
+pip install -r requirements-voice.txt
+
+# Run dictation in a separate terminal:
+python stt_hotkey.py
 ```
 
 Open:
@@ -42,18 +72,28 @@ If your repo is public, enable GitHub Pages:
 
 To use away from home, run a tunnel:
 ```bash
+# Install cloudflared and run tunnel
 cloudflared tunnel --url http://localhost:8000
 ```
-Then open the tunnel URL on your phone.
+
+**Important for HTTPS:** GitHub Pages serves over HTTPS, but your local server runs on HTTP. Modern browsers require HTTPS-to-HTTPS calls, so you need the HTTPS tunnel URL from cloudflared.
+
+Then open the tunnel URL on your phone or use it as the API endpoint in your deployed Pages app.
 
 ## Voice dictation on PC
 
-Offline & accurate:
+Offline & accurate (requires voice dependencies):
 ```bash
+# Install voice dependencies first
+pip install -r requirements-voice.txt
+
+# Then run dictation
 python stt_hotkey.py
 # Press Enter to start recording, Enter to stop.
 ```
 It posts to `/capture`. The server decides memory vs reminder and parses simple times.
+
+**Windows shortcut:** Use `.\scripts\start-dictation.ps1` to install deps and start dictation automatically.
 
 ## Don’t commit secrets/data
 - Keep `.env` and `server/app.db` out of git (already in `.gitignore`).
