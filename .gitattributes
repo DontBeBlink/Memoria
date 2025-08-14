@@ -1,0 +1,38 @@
+# Enforce consistent handling of text vs binary files and preferred line endings.
+# This helps avoid CRLF/LF churn on Windows and ensures binary files are not
+# treated as text by Git.
+
+# Treat all files Git detects as text; normalize to LF in repository and
+# use LF in working tree as well (helps cross-platform consistency).
+* text=auto eol=lf
+
+# Explicit text files that should use LF
+*.py text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Common binary files (do not attempt to normalize or diff them)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+
+# Ensure the attributes file itself uses LF
+.gitattributes text eol=lf
+
+# Prevent local secrets and DB from being exported in archives
+server/app.db export-ignore
+.env export-ignore
+.env.* export-ignore
+
+# End of file
