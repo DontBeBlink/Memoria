@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 import requests
 
 from . import storage
-from .schemas import MemoryIn, TaskIn, CaptureIn, TranscriptionResponse
+from .schemas import MemoryIn, MemoryPatch, TaskIn, TaskPatch, CaptureIn, TranscriptionResponse
 
 load_dotenv()
 
@@ -97,6 +97,22 @@ def get_memories(auth=Depends(require_auth)):
 def post_memory(mem: MemoryIn, auth=Depends(require_auth)):
   return storage.add_memory(mem.text)
 
+@app.patch("/memories/{memory_id}")
+def patch_memory(memory_id: int, mem: MemoryPatch, auth=Depends(require_auth)):
+  # Prepare fields to update
+  fields = {}
+  if mem.text is not None:
+    fields["text"] = mem.text
+  
+  if not fields:
+    raise HTTPException(status_code=400, detail="No fields to update")
+  
+  result = storage.update_memory(memory_id, **fields)
+  if not result:
+    raise HTTPException(status_code=404, detail="Memory not found")
+  
+  return result
+
 @app.delete("/memories/{memory_id}", status_code=204)
 def delete_memory(memory_id: int, auth=Depends(require_auth)):
   deleted = storage.delete_memory(memory_id)
@@ -111,6 +127,26 @@ def get_tasks(open_only: bool = False, auth=Depends(require_auth)):
 @app.post("/tasks")
 def post_task(task: TaskIn, auth=Depends(require_auth)):
   return storage.add_task(task.title, task.due)
+
+@app.patch("/tasks/{task_id}")
+def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
+  # Prepare fields to update
+  fields = {}
+  if task.title is not None:
+    fields["title"] = task.title
+  if task.due is not None:
+    fields["due"] = task.due
+  if task.done is not None:
+    fields["done"] = task.done
+  
+  if not fields:
+    raise HTTPException(status_code=400, detail="No fields to update")
+  
+  result = storage.update_task(task_id, **fields)
+  if not result:
+    raise HTTPException(status_code=404, detail="Task not found")
+  
+  return result
 
 @app.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int, auth=Depends(require_auth)):

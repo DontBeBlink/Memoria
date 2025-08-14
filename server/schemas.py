@@ -4,9 +4,17 @@ from typing import Optional, List
 class MemoryIn(BaseModel):
     text: str = Field(..., min_length=1)
 
+class MemoryPatch(BaseModel):
+    text: Optional[str] = Field(None, min_length=1)
+
 class TaskIn(BaseModel):
     title: str = Field(..., min_length=1)
     due: Optional[str] = None  # ISO datetime string
+
+class TaskPatch(BaseModel):
+    title: Optional[str] = Field(None, min_length=1)
+    due: Optional[str] = None  # ISO datetime string
+    done: Optional[bool] = None
 
 class CaptureIn(BaseModel):
     text: str = Field(..., min_length=1)
