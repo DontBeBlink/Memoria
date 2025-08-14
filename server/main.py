@@ -1,10 +1,11 @@
 import os
 import threading
 import time
+import tempfile
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 
-from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,7 +13,7 @@ from dotenv import load_dotenv
 import requests
 
 from . import storage
-from .schemas import MemoryIn, TaskIn, CaptureIn
+from .schemas import MemoryIn, MemoryPatch, TaskIn, TaskPatch, CaptureIn, TranscriptionResponse
 import json
 
 load_dotenv()
@@ -20,6 +21,9 @@ load_dotenv()
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "")
 NTFY_SERVER = os.getenv("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small.en")
+TRANSCRIPTION_LANGUAGE = os.getenv("TRANSCRIPTION_LANGUAGE", "en")
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WEB_DIR = os.path.join(os.path.dirname(__file__), "..", "web")
 
 app = FastAPI(title="Memoria Server")
@@ -87,12 +91,48 @@ def get_icon(icon_name: str):
   raise HTTPException(status_code=404, detail="Icon not found")
 
 @app.get("/memories")
-def get_memories(auth=Depends(require_auth)):
-  return storage.list_memories()
+def get_memories(q: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None, auth=Depends(require_auth)):
+  # Determine if we're using new functionality (pagination/search)
+  using_new_features = q is not None or limit is not None or offset is not None
+  
+  # Set defaults
+  actual_limit = limit if limit is not None else (50 if using_new_features else 100)
+  actual_offset = offset if offset is not None else 0
+  
+  result = storage.list_memories(limit=actual_limit, offset=actual_offset, query=q)
+  
+  # For backward compatibility, if no new parameters are provided, return just the items
+  if not using_new_features:
+    return result["items"]
+  
+  return result
 
 @app.post("/memories")
 def post_memory(mem: MemoryIn, auth=Depends(require_auth)):
   return storage.add_memory(mem.text)
+
+@app.patch("/memories/{memory_id}")
+def patch_memory(memory_id: int, mem: MemoryPatch, auth=Depends(require_auth)):
+  # Prepare fields to update
+  fields = {}
+  if mem.text is not None:
+    fields["text"] = mem.text
+  
+  if not fields:
+    raise HTTPException(status_code=400, detail="No fields to update")
+  
+  result = storage.update_memory(memory_id, **fields)
+  if not result:
+    raise HTTPException(status_code=404, detail="Memory not found")
+  
+  return result
+
+@app.delete("/memories/{memory_id}", status_code=204)
+def delete_memory(memory_id: int, auth=Depends(require_auth)):
+  deleted = storage.delete_memory(memory_id)
+  if not deleted:
+    raise HTTPException(status_code=404, detail="Not found")
+  return None
 
 @app.get("/tasks")
 def get_tasks(open_only: bool = False, auth=Depends(require_auth)):
@@ -101,6 +141,33 @@ def get_tasks(open_only: bool = False, auth=Depends(require_auth)):
 @app.post("/tasks")
 def post_task(task: TaskIn, auth=Depends(require_auth)):
   return storage.add_task(task.title, task.due)
+
+@app.patch("/tasks/{task_id}")
+def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
+  # Prepare fields to update
+  fields = {}
+  if task.title is not None:
+    fields["title"] = task.title
+  if task.due is not None:
+    fields["due"] = task.due
+  if task.done is not None:
+    fields["done"] = task.done
+  
+  if not fields:
+    raise HTTPException(status_code=400, detail="No fields to update")
+  
+  result = storage.update_task(task_id, **fields)
+  if not result:
+    raise HTTPException(status_code=404, detail="Task not found")
+  
+  return result
+
+@app.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: int, auth=Depends(require_auth)):
+  deleted = storage.delete_task(task_id)
+  if not deleted:
+    raise HTTPException(status_code=404, detail="Not found")
+  return None
 
 @app.post("/tasks/{task_id}/done")
 def done_task(task_id: int, done: bool = True, auth=Depends(require_auth)):
@@ -152,6 +219,74 @@ def import_data(data: dict, overwrite: bool = False, auth=Depends(require_auth))
       results["tasks"][status] += 1
   
   return results
+
+@app.post("/transcribe", response_model=TranscriptionResponse)
+async def transcribe_audio(audio: UploadFile = File(...), auth=Depends(require_auth)):
+    """Transcribe audio file using faster-whisper"""
+    # Check file type
+    if not audio.content_type or not audio.content_type.startswith('audio/'):
+        raise HTTPException(status_code=400, detail="File must be an audio file")
+    
+    try:
+        # Import here to allow server to start even if faster-whisper isn't available
+        from faster_whisper import WhisperModel
+        
+        # Create a temporary file to save the uploaded audio
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
+            content = await audio.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        try:
+            # Initialize Whisper model (this will be cached)
+            if not hasattr(transcribe_audio, '_whisper_model'):
+                try:
+                    transcribe_audio._whisper_model = WhisperModel(
+                        WHISPER_MODEL, 
+                        device=WHISPER_DEVICE, 
+                        compute_type="auto",
+                        local_files_only=False  # Allow downloading models
+                    )
+                except Exception as model_error:
+                    # Provide helpful error message if model can't be loaded
+                    error_msg = str(model_error)
+                    if "internet connection" in error_msg.lower() or "network" in error_msg.lower():
+                        raise HTTPException(status_code=500, detail="Cannot download Whisper model. Please check internet connection and try again.")
+                    elif "local_files_only" in error_msg:
+                        raise HTTPException(status_code=500, detail="Whisper model not found. Please ensure internet connection for first-time model download.")
+                    else:
+                        raise HTTPException(status_code=500, detail=f"Failed to initialize Whisper model: {error_msg}")
+            
+            model = transcribe_audio._whisper_model
+            
+            # Transcribe the audio
+            segments, info = model.transcribe(
+                tmp_file_path, 
+                language=TRANSCRIPTION_LANGUAGE if TRANSCRIPTION_LANGUAGE != 'auto' else None,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=300)
+            )
+            
+            # Extract text from segments
+            text = " ".join(seg.text.strip() for seg in segments).strip()
+            
+            if not text:
+                raise HTTPException(status_code=400, detail="No speech detected in audio")
+                
+            return TranscriptionResponse(text=text)
+            
+        finally:
+            # Clean up the temporary file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
+            
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Speech recognition not available. Install voice dependencies with: pip install -r requirements-voice.txt")
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
 # --------- helpers
 

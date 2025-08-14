@@ -65,11 +65,38 @@ def add_task(title: str, due: Optional[str]) -> Dict[str, Any]:
   conn.close()
   return dict(row)
 
-def list_memories(limit: int = 100):
+def list_memories(limit: int = 100, offset: int = 0, query: Optional[str] = None):
   conn = _connect()
-  rows = conn.execute("SELECT * FROM memories ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+  
+  # Build the SQL query based on search parameters
+  base_sql = "SELECT * FROM memories"
+  count_sql = "SELECT COUNT(*) FROM memories"
+  params = []
+  
+  if query:
+    where_clause = " WHERE text LIKE ? OR tags LIKE ?"
+    base_sql += where_clause
+    count_sql += where_clause
+    search_term = f"%{query}%"
+    params.extend([search_term, search_term])
+  
+  # Add ordering and pagination
+  base_sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
+  params.extend([limit, offset])
+  
+  # Get the data
+  rows = conn.execute(base_sql, params).fetchall()
+  
+  # Get the total count (for pagination)
+  count_params = params[:-2] if query else []  # Remove limit and offset from count query
+  total = conn.execute(count_sql, count_params).fetchone()[0]
+  
   conn.close()
-  return [dict(r) for r in rows]
+  
+  return {
+    "items": [dict(r) for r in rows],
+    "total": total
+  }
 
 def list_tasks(open_only: bool = False, limit: int = 200):
   conn = _connect()
@@ -193,3 +220,97 @@ def get_all_tasks():
   rows = conn.execute("SELECT * FROM tasks ORDER BY id ASC").fetchall()
   conn.close()
   return [dict(r) for r in rows]
+
+def delete_memory(memory_id: int) -> bool:
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("DELETE FROM memories WHERE id=?", (memory_id,))
+  deleted = cur.rowcount > 0
+  conn.commit()
+  conn.close()
+  return deleted
+
+def delete_task(task_id: int) -> bool:
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+  deleted = cur.rowcount > 0
+  conn.commit()
+  conn.close()
+  return deleted
+
+def update_memory(memory_id: int, **fields) -> Optional[Dict[str, Any]]:
+  if not fields:
+    return None
+  
+  conn = _connect()
+  cur = conn.cursor()
+  
+  # Build dynamic update query
+  set_clauses = []
+  values = []
+  for field, value in fields.items():
+    if field == "text":
+      set_clauses.append("text = ?")
+      values.append(value)
+      # Update tags when text changes
+      set_clauses.append("tags = ?")
+      values.append(_tags_from(value))
+  
+  if not set_clauses:
+    conn.close()
+    return None
+  
+  values.append(memory_id)
+  query = f"UPDATE memories SET {', '.join(set_clauses)} WHERE id = ?"
+  cur.execute(query, values)
+  conn.commit()
+  
+  if cur.rowcount == 0:
+    conn.close()
+    return None
+  
+  row = cur.execute("SELECT * FROM memories WHERE id=?", (memory_id,)).fetchone()
+  conn.close()
+  return dict(row) if row else None
+
+def update_task(task_id: int, **fields) -> Optional[Dict[str, Any]]:
+  if not fields:
+    return None
+  
+  conn = _connect()
+  cur = conn.cursor()
+  
+  # Build dynamic update query
+  set_clauses = []
+  values = []
+  for field, value in fields.items():
+    if field == "title":
+      set_clauses.append("title = ?")
+      values.append(value)
+      # Update tags when title changes
+      set_clauses.append("tags = ?")
+      values.append(_tags_from(value))
+    elif field == "due":
+      set_clauses.append("due = ?")
+      values.append(value)
+    elif field == "done":
+      set_clauses.append("done = ?")
+      values.append(1 if value else 0)
+  
+  if not set_clauses:
+    conn.close()
+    return None
+  
+  values.append(task_id)
+  query = f"UPDATE tasks SET {', '.join(set_clauses)} WHERE id = ?"
+  cur.execute(query, values)
+  conn.commit()
+  
+  if cur.rowcount == 0:
+    conn.close()
+    return None
+  
+  row = cur.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+  conn.close()
+  return dict(row) if row else None
