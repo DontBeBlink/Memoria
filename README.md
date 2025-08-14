@@ -13,17 +13,24 @@ Contents
 
 ## Run the server (Windows/macOS/Linux)
 
+### Quick start (Windows)
+```powershell
+# Double-click or run from PowerShell:
+scripts\start-server.ps1
+```
+
+### Manual setup (all platforms)
 ```bash
 python -m venv .venv
 # Windows:
-. .venv/Scripts/activate
+.venv\Scripts\activate
 # macOS/Linux:
 # source .venv/bin/activate
 
-pip install -r requirements.txt
+pip install -r requirements-server.txt
 cp .env.example .env  # then edit AUTH_TOKEN, etc.
 
-uvicorn server.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn server.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Open:
@@ -48,8 +55,16 @@ Then open the tunnel URL on your phone.
 
 ## Voice dictation on PC
 
-Offline & accurate:
+### Quick start (Windows)
+```powershell
+# Double-click or run from PowerShell:
+scripts\start-dictation.ps1
+```
+
+### Manual setup (all platforms)
 ```bash
+# In the same terminal where server venv is activated:
+pip install -r requirements-voice.txt
 python stt_hotkey.py
 # Press Enter to start recording, Enter to stop.
 ```

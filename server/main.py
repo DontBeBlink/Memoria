@@ -67,6 +67,21 @@ def get_service_worker():
     return FileResponse(sw_path, media_type="application/javascript")
   raise HTTPException(status_code=404, detail="Service worker not found")
 
+@app.get("/favicon.svg")
+def get_favicon():
+  favicon_path = os.path.join(WEB_DIR, "favicon.svg")
+  if os.path.exists(favicon_path):
+    return FileResponse(favicon_path, media_type="image/svg+xml")
+  raise HTTPException(status_code=404, detail="Favicon not found")
+
+@app.get("/favicon.ico")
+def get_favicon_ico():
+  # Redirect to SVG favicon
+  favicon_path = os.path.join(WEB_DIR, "favicon.svg")
+  if os.path.exists(favicon_path):
+    return FileResponse(favicon_path, media_type="image/svg+xml")
+  raise HTTPException(status_code=404, detail="Favicon not found")
+
 @app.get("/memories")
 def get_memories(auth=Depends(require_auth)):
   return storage.list_memories()

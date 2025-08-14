@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#0f172a" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <style>
     :root { color-scheme: light dark; }
@@ -26,6 +27,7 @@
     .pill { background:#1f2937; color:#e5e7eb; border-radius:999px; padding:4px 8px; font-size:12px; }
     .sec-title { display:flex; justify-content:space-between; align-items:center; }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    .auth-warning { background:#dc2626; color:white; padding:8px 12px; margin:12px 16px; border-radius:8px; font-size:14px; display:none; }
     @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -39,6 +41,9 @@
       <button id="refresh">Refresh</button>
     </div>
   </header>
+  <div id="authWarning" class="auth-warning">
+    ⚠️ Unauthorized access. Please set your Passcode in the header to match the AUTH_TOKEN from your .env file.
+  </div>
   <main>
     <section class="grid">
       <div>
@@ -86,23 +91,37 @@
     const energySel = document.getElementById('energy');
     const suggestBtn = document.getElementById('suggest');
     const planList = document.getElementById('planList');
+    const authWarning = document.getElementById('authWarning');
 
     let PASS = localStorage.getItem('memoria_pass') || '';
     passEl.value = PASS;
 
-    savePassBtn.onclick = () => { PASS = passEl.value.trim(); localStorage.setItem('memoria_pass', PASS); alert('Passcode set locally'); };
+    savePassBtn.onclick = () => { PASS = passEl.value.trim(); localStorage.setItem('memoria_pass', PASS); authWarning.style.display = 'none'; alert('Passcode set locally'); };
 
     async function api(path, method='GET', body=null) {
-      const res = await fetch(API + path, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(PASS ? {'x-auth-token': PASS} : {})
-        },
-        body: body ? JSON.stringify(body) : null
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
+      try {
+        const res = await fetch(API + path, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(PASS ? {'x-auth-token': PASS} : {})
+          },
+          body: body ? JSON.stringify(body) : null
+        });
+        if (res.status === 401) {
+          authWarning.style.display = 'block';
+          throw new Error('Unauthorized');
+        } else {
+          authWarning.style.display = 'none';
+        }
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      } catch (err) {
+        if (err.message === 'Unauthorized') {
+          authWarning.style.display = 'block';
+        }
+        throw err;
+      }
     }
 
     async function loadAll() {
