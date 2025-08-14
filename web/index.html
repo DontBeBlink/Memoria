@@ -30,6 +30,14 @@
     @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
     .auth-warning { background:#dc2626; color:white; padding:12px 16px; display:none; border-left:4px solid #b91c1c; }
     .auth-warning.show { display:block; }
+    .mic-button { background:#dc2626; color:white; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer; border:0; transition:all 0.2s; }
+    .mic-button:hover { background:#b91c1c; transform:scale(1.05); }
+    .mic-button.recording { background:#ef4444; animation:pulse 1s infinite; }
+    .mic-button:disabled { background:#6b7280; cursor:not-allowed; }
+    @keyframes pulse { 0%, 100% { opacity:1; } 50% { opacity:0.7; } }
+    .status-message { background:#1f2937; color:#e5e7eb; padding:8px 12px; border-radius:6px; font-size:12px; display:none; margin-left:8px; }
+    .error-banner { background:#dc2626; color:white; padding:8px 16px; display:none; border-radius:6px; margin:8px 0; font-size:14px; }
+    .error-banner.show { display:block; }
   </style>
 </head>
 <body>
@@ -38,12 +46,17 @@
     <div class="row">
       <input id="pass" type="text" placeholder="Passcode" style="max-width:160px;"/>
       <button id="savePass">Set</button>
+      <button id="micButton" class="mic-button" title="Hold to record voice memo">🎤</button>
+      <span id="micStatus" class="status-message"></span>
       <button id="install" style="display:none;">Install App</button>
       <button id="refresh">Refresh</button>
     </div>
   </header>
   <div id="authWarning" class="auth-warning">
     <strong>Unauthorized!</strong> Please set your Passcode to match the AUTH_TOKEN from your .env file.
+  </div>
+  <div id="errorBanner" class="error-banner">
+    <strong>Error:</strong> <span id="errorMessage"></span>
   </div>
   <main>
     <section class="grid">
@@ -227,6 +240,39 @@
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
 
     loadAll().catch(err => alert('Error: ' + err.message));
+  </script>
+  <script src="web/js/dictation.js"></script>
+  <script>
+    // Initialize voice dictation
+    const voiceDictation = new VoiceDictation();
+    const errorBanner = document.getElementById('errorBanner');
+    const errorMessage = document.getElementById('errorMessage');
+
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorBanner.classList.add('show');
+      setTimeout(() => {
+        errorBanner.classList.remove('show');
+      }, 5000);
+    }
+
+    voiceDictation.init(
+      'micButton',
+      'micStatus',
+      async (transcribedText) => {
+        // On successful transcription, create a memory
+        try {
+          await api('/memories', 'POST', { text: transcribedText });
+          await loadAll(); // Refresh the memory list
+        } catch (err) {
+          showError(`Failed to save memory: ${err.message}`);
+        }
+      },
+      (errorMsg) => {
+        // On error
+        showError(errorMsg);
+      }
+    );
   </script>
 </body>
 </html>

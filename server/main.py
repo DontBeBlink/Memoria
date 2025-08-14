@@ -1,10 +1,11 @@
 import os
 import threading
 import time
+import tempfile
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,13 +13,16 @@ from dotenv import load_dotenv
 import requests
 
 from . import storage
-from .schemas import MemoryIn, TaskIn, CaptureIn
+from .schemas import MemoryIn, TaskIn, CaptureIn, TranscriptionResponse
 
 load_dotenv()
 
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "")
 NTFY_SERVER = os.getenv("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small.en")
+TRANSCRIPTION_LANGUAGE = os.getenv("TRANSCRIPTION_LANGUAGE", "en")
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WEB_DIR = os.path.join(os.path.dirname(__file__), "..", "web")
 
 app = FastAPI(title="Memoria Server")
@@ -117,6 +121,59 @@ def capture(data: CaptureIn, auth=Depends(require_auth)):
   else:
     row = storage.add_memory(parsed["text"])
     return {"type": "memory", "item": row}
+
+@app.post("/transcribe", response_model=TranscriptionResponse)
+async def transcribe_audio(audio: UploadFile = File(...), auth=Depends(require_auth)):
+    """Transcribe audio file using faster-whisper"""
+    # Check file type
+    if not audio.content_type or not audio.content_type.startswith('audio/'):
+        raise HTTPException(status_code=400, detail="File must be an audio file")
+    
+    try:
+        # Import here to allow server to start even if faster-whisper isn't available
+        from faster_whisper import WhisperModel
+        
+        # Create a temporary file to save the uploaded audio
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
+            content = await audio.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        try:
+            # Initialize Whisper model (this will be cached)
+            if not hasattr(transcribe_audio, '_whisper_model'):
+                transcribe_audio._whisper_model = WhisperModel(
+                    WHISPER_MODEL, 
+                    device=WHISPER_DEVICE, 
+                    compute_type="auto"
+                )
+            
+            model = transcribe_audio._whisper_model
+            
+            # Transcribe the audio
+            segments, info = model.transcribe(
+                tmp_file_path, 
+                language=TRANSCRIPTION_LANGUAGE if TRANSCRIPTION_LANGUAGE != 'auto' else None,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=300)
+            )
+            
+            # Extract text from segments
+            text = " ".join(seg.text.strip() for seg in segments).strip()
+            
+            if not text:
+                raise HTTPException(status_code=400, detail="No speech detected in audio")
+                
+            return TranscriptionResponse(text=text)
+            
+        finally:
+            # Clean up the temporary file
+            os.unlink(tmp_file_path)
+            
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Speech recognition not available. Install voice dependencies.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
 # --------- helpers
 
