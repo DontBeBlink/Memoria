@@ -95,6 +95,14 @@ It posts to `/capture`. The server decides memory vs reminder and parses simple 
 
 **Windows shortcut:** Use `.\scripts\start-dictation.ps1` to install deps and start dictation automatically.
 
+## Deleting memories and tasks
+
+Each memory and task has a trash icon (🗑️) button for deletion:
+- Click the delete button to get a confirmation dialog
+- Deleted items are permanently removed (hard delete)
+- API returns 404 for unknown IDs; UI shows "Item already gone" message
+- Works with keyboard navigation (Tab to focus, Enter/Space to activate)
+
 ## Web-based voice dictation
 
 The web interface includes a built-in voice dictation feature:

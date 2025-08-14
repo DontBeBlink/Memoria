@@ -97,6 +97,13 @@ def get_memories(auth=Depends(require_auth)):
 def post_memory(mem: MemoryIn, auth=Depends(require_auth)):
   return storage.add_memory(mem.text)
 
+@app.delete("/memories/{memory_id}", status_code=204)
+def delete_memory(memory_id: int, auth=Depends(require_auth)):
+  deleted = storage.delete_memory(memory_id)
+  if not deleted:
+    raise HTTPException(status_code=404, detail="Not found")
+  return None
+
 @app.get("/tasks")
 def get_tasks(open_only: bool = False, auth=Depends(require_auth)):
   return storage.list_tasks(open_only=open_only)
@@ -104,6 +111,13 @@ def get_tasks(open_only: bool = False, auth=Depends(require_auth)):
 @app.post("/tasks")
 def post_task(task: TaskIn, auth=Depends(require_auth)):
   return storage.add_task(task.title, task.due)
+
+@app.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: int, auth=Depends(require_auth)):
+  deleted = storage.delete_task(task_id)
+  if not deleted:
+    raise HTTPException(status_code=404, detail="Not found")
+  return None
 
 @app.post("/tasks/{task_id}/done")
 def done_task(task_id: int, done: bool = True, auth=Depends(require_auth)):
