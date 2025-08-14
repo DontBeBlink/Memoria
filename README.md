@@ -95,6 +95,29 @@ It posts to `/capture`. The server decides memory vs reminder and parses simple 
 
 **Windows shortcut:** Use `.\scripts\start-dictation.ps1` to install deps and start dictation automatically.
 
+## Backup and Data Migration
+
+Memoria includes backup functionality to export and import your data:
+
+### Export Data
+- Visit the **Backup** page from the header link
+- Click "Download Backup" to export all memories and tasks as JSON
+- File format: `{"memories": [...], "tasks": [...]}`
+
+### Import Data
+- Use the same Backup page to upload a JSON backup file
+- Choose "Overwrite existing items" to update records with same IDs
+- Leave unchecked to skip duplicates (safer option)
+- Import reports show counts of inserted/updated/skipped/failed records
+
+### API Endpoints
+- `GET /export` - Returns JSON with all memories and tasks
+- `POST /import?overwrite=false` - Imports JSON data, accepts overwrite flag
+
+### Use Cases
+- **Backup**: Regular exports for data safety
+- **Migration**: Move data between instances
+- **Testing**: Delete database, import backup to restore
 ## Don’t commit secrets/data
 - Keep `.env` and `server/app.db` out of git (already in `.gitignore`).
 - Commit `.env.example` only.
