@@ -131,3 +131,97 @@ def set_notified(task_id: int, when_iso: str):
   conn.execute("UPDATE tasks SET notified_at=? WHERE id=?", (when_iso, task_id))
   conn.commit()
   conn.close()
+
+def delete_memory(memory_id: int) -> bool:
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("DELETE FROM memories WHERE id=?", (memory_id,))
+  deleted = cur.rowcount > 0
+  conn.commit()
+  conn.close()
+  return deleted
+
+def delete_task(task_id: int) -> bool:
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+  deleted = cur.rowcount > 0
+  conn.commit()
+  conn.close()
+  return deleted
+
+def update_memory(memory_id: int, **fields) -> Optional[Dict[str, Any]]:
+  if not fields:
+    return None
+  
+  conn = _connect()
+  cur = conn.cursor()
+  
+  # Build dynamic update query
+  set_clauses = []
+  values = []
+  for field, value in fields.items():
+    if field == "text":
+      set_clauses.append("text = ?")
+      values.append(value)
+      # Update tags when text changes
+      set_clauses.append("tags = ?")
+      values.append(_tags_from(value))
+  
+  if not set_clauses:
+    conn.close()
+    return None
+  
+  values.append(memory_id)
+  query = f"UPDATE memories SET {', '.join(set_clauses)} WHERE id = ?"
+  cur.execute(query, values)
+  conn.commit()
+  
+  if cur.rowcount == 0:
+    conn.close()
+    return None
+  
+  row = cur.execute("SELECT * FROM memories WHERE id=?", (memory_id,)).fetchone()
+  conn.close()
+  return dict(row) if row else None
+
+def update_task(task_id: int, **fields) -> Optional[Dict[str, Any]]:
+  if not fields:
+    return None
+  
+  conn = _connect()
+  cur = conn.cursor()
+  
+  # Build dynamic update query
+  set_clauses = []
+  values = []
+  for field, value in fields.items():
+    if field == "title":
+      set_clauses.append("title = ?")
+      values.append(value)
+      # Update tags when title changes
+      set_clauses.append("tags = ?")
+      values.append(_tags_from(value))
+    elif field == "due":
+      set_clauses.append("due = ?")
+      values.append(value)
+    elif field == "done":
+      set_clauses.append("done = ?")
+      values.append(1 if value else 0)
+  
+  if not set_clauses:
+    conn.close()
+    return None
+  
+  values.append(task_id)
+  query = f"UPDATE tasks SET {', '.join(set_clauses)} WHERE id = ?"
+  cur.execute(query, values)
+  conn.commit()
+  
+  if cur.rowcount == 0:
+    conn.close()
+    return None
+  
+  row = cur.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+  conn.close()
+  return dict(row) if row else None

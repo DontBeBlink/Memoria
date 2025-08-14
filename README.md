@@ -95,6 +95,39 @@ It posts to `/capture`. The server decides memory vs reminder and parses simple 
 
 **Windows shortcut:** Use `.\scripts\start-dictation.ps1` to install deps and start dictation automatically.
 
+## Deleting memories and tasks
+
+Each memory and task has a trash icon (🗑️) button for deletion:
+- Click the delete button to get a confirmation dialog
+- Deleted items are permanently removed (hard delete)
+- API returns 404 for unknown IDs; UI shows "Item already gone" message
+- Works with keyboard navigation (Tab to focus, Enter/Space to activate)
+
+## Web-based voice dictation
+
+The web interface includes a built-in voice dictation feature:
+
+- **🎤 Mic button** in the header for voice recording
+- **Hold-to-record**: Press and hold the mic button to record, release to stop and transcribe
+- **Automatic memory creation**: Transcribed text is automatically saved as a memory
+- **Error handling**: Shows clear error messages for permission issues or transcription failures
+
+**Setup:**
+1. Install voice dependencies: `pip install -r requirements-voice.txt`
+2. Configure in `.env`:
+   ```bash
+   WHISPER_MODEL=small.en          # Base, small, medium, large-v3, etc.
+   TRANSCRIPTION_LANGUAGE=en       # Language code or 'auto'
+   WHISPER_DEVICE=cpu              # 'cpu' or 'cuda' (if GPU available)
+   ```
+3. Grant microphone permission when prompted
+
+**Features:**
+- Works on Chrome/Edge (Windows) and Chrome (macOS)
+- Offline transcription using faster-whisper
+- Respects AUTH_TOKEN authentication
+- Visual feedback during recording and transcription
+
 ## Don’t commit secrets/data
 - Keep `.env` and `server/app.db` out of git (already in `.gitignore`).
 - Commit `.env.example` only.
