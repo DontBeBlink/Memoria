@@ -53,7 +53,17 @@
           <input id="memText" type="text" placeholder="@Sirine is a cutie pie"/>
           <button type="submit">Save</button>
         </form>
+        <div class="row" style="margin-bottom:8px;">
+          <input id="memSearch" type="text" placeholder="Search memories..." style="max-width:200px;"/>
+          <button id="memSearchBtn">Search</button>
+          <button id="memClearBtn">Clear</button>
+        </div>
         <ul id="memList"></ul>
+        <div id="memPagination" class="row" style="justify-content:center; margin-top:8px; display:none;">
+          <button id="memPrevBtn">Previous</button>
+          <span id="memPageInfo" style="margin:0 12px;"></span>
+          <button id="memNextBtn">Next</button>
+        </div>
       </div>
       <div>
         <div class="sec-title"><h3>Promemoria</h3><span class="muted">Natural language times (e.g., tomorrow 9am, in 7 hours)</span></div>
@@ -85,6 +95,13 @@
     const memForm = document.getElementById('memForm');
     const memText = document.getElementById('memText');
     const memList = document.getElementById('memList');
+    const memSearch = document.getElementById('memSearch');
+    const memSearchBtn = document.getElementById('memSearchBtn');
+    const memClearBtn = document.getElementById('memClearBtn');
+    const memPagination = document.getElementById('memPagination');
+    const memPrevBtn = document.getElementById('memPrevBtn');
+    const memNextBtn = document.getElementById('memNextBtn');
+    const memPageInfo = document.getElementById('memPageInfo');
     const taskForm = document.getElementById('taskForm');
     const taskText = document.getElementById('taskText');
     const taskList = document.getElementById('taskList');
@@ -96,6 +113,11 @@
     let PASS = localStorage.getItem('memoria_pass') || '';
     passEl.value = PASS;
     const authWarning = document.getElementById('authWarning');
+
+    // Pagination state
+    let memCurrentPage = 0;
+    let memCurrentQuery = '';
+    const memPerPage = 50;
 
     savePassBtn.onclick = () => { PASS = passEl.value.trim(); localStorage.setItem('memoria_pass', PASS); alert('Passcode set locally'); };
 
@@ -120,12 +142,47 @@
       return res.json();
     }
 
+    async function loadMemories() {
+      const params = new URLSearchParams();
+      if (memCurrentQuery) {
+        params.append('q', memCurrentQuery);
+      }
+      params.append('limit', memPerPage.toString());
+      params.append('offset', (memCurrentPage * memPerPage).toString());
+      
+      const result = await api(`/memories?${params.toString()}`);
+      
+      if (result && Array.isArray(result)) {
+        // Backward compatibility: no pagination info
+        renderList(memList, result, 'memory');
+        memPagination.style.display = 'none';
+      } else {
+        // New format with pagination
+        renderList(memList, result.items, 'memory');
+        updateMemoryPagination(result.total);
+      }
+    }
+
+    function updateMemoryPagination(total) {
+      const totalPages = Math.ceil(total / memPerPage);
+      const currentPageNum = memCurrentPage + 1;
+      
+      if (totalPages <= 1) {
+        memPagination.style.display = 'none';
+        return;
+      }
+      
+      memPagination.style.display = 'flex';
+      memPageInfo.textContent = `Page ${currentPageNum} of ${totalPages} (${total} total)`;
+      memPrevBtn.disabled = memCurrentPage === 0;
+      memNextBtn.disabled = memCurrentPage >= totalPages - 1;
+    }
+
     async function loadAll() {
-      const [mems, tasks] = await Promise.all([
-        api('/memories'),
+      const [_, tasks] = await Promise.all([
+        loadMemories(),
         api('/tasks?open_only=true')
       ]);
-      renderList(memList, mems, 'memory');
       renderTasks(tasks);
     }
 
@@ -164,6 +221,8 @@
       const text = memText.value.trim(); if (!text) return;
       await api('/memories', 'POST', { text });
       memText.value = '';
+      // Reset to first page when adding new memory
+      memCurrentPage = 0;
       await loadAll();
     };
 
@@ -176,6 +235,39 @@
     };
 
     refreshBtn.onclick = loadAll;
+
+    // Memory search and pagination handlers
+    memSearchBtn.onclick = async () => {
+      memCurrentQuery = memSearch.value.trim();
+      memCurrentPage = 0;
+      await loadMemories();
+    };
+
+    memClearBtn.onclick = async () => {
+      memSearch.value = '';
+      memCurrentQuery = '';
+      memCurrentPage = 0;
+      await loadMemories();
+    };
+
+    memPrevBtn.onclick = async () => {
+      if (memCurrentPage > 0) {
+        memCurrentPage--;
+        await loadMemories();
+      }
+    };
+
+    memNextBtn.onclick = async () => {
+      memCurrentPage++;
+      await loadMemories();
+    };
+
+    // Allow enter key to search
+    memSearch.onkeypress = (e) => {
+      if (e.key === 'Enter') {
+        memSearchBtn.click();
+      }
+    };
 
     suggestBtn.onclick = async () => {
       const tasks = await api('/tasks?open_only=true');
