@@ -105,6 +105,24 @@ def set_notified(task_id: int, when_iso: str):
   conn.commit()
   conn.close()
 
+def delete_memory(memory_id: int) -> bool:
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("DELETE FROM memories WHERE id=?", (memory_id,))
+  deleted = cur.rowcount > 0
+  conn.commit()
+  conn.close()
+  return deleted
+
+def delete_task(task_id: int) -> bool:
+  conn = _connect()
+  cur = conn.cursor()
+  cur.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+  deleted = cur.rowcount > 0
+  conn.commit()
+  conn.close()
+  return deleted
+
 def update_memory(memory_id: int, **fields) -> Optional[Dict[str, Any]]:
   if not fields:
     return None

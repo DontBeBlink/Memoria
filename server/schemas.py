@@ -33,3 +33,6 @@ class Task(BaseModel):
     created: str
     tags: List[str]
     notified_at: Optional[str] = None
+
+class TranscriptionResponse(BaseModel):
+    text: str
