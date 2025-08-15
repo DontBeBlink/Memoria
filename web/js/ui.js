@@ -1,6 +1,6 @@
 /**
  * Shared UI components for Memoria
- * Handles header rendering, navigation, breadcrumbs, and auth banner
+ * Handles header rendering, navigation, breadcrumbs, auth banner, and offline indicators
  */
 
 class MemoriaUI {
@@ -51,6 +51,7 @@ class MemoriaUI {
         <button id="savePass">Set</button>
         ${showMicButton ? '<button id="micButton" class="mic-button" title="Hold to record voice memo">🎤</button>' : ''}
         ${showMicButton ? '<span id="micStatus" class="status-message"></span>' : ''}
+        <span id="queueIndicator" class="queue-indicator" style="display:none;"></span>
         ${showInstallButton ? '<button id="install" style="display:none;">Install App</button>' : ''}
       </div>
     `;
@@ -66,6 +67,19 @@ class MemoriaUI {
     if (showInstallButton && onInstallClick) {
       const installButton = containerElement.querySelector('#install');
       if (installButton) installButton.addEventListener('click', onInstallClick);
+    }
+
+    // Setup offline and queue indicators
+    this.setupOfflineIndicators(containerElement);
+  }
+
+  /**
+   * Setup offline and queue indicators
+   */
+  setupOfflineIndicators(containerElement) {
+    const queueIndicator = containerElement.querySelector('#queueIndicator');
+    if (queueIndicator) {
+      window.memoriaAPI.setQueueIndicator(queueIndicator);
     }
   }
 
@@ -118,6 +132,23 @@ class MemoriaUI {
     window.memoriaAPI.setAuthWarningElement(authWarning);
     
     return authWarning;
+  }
+
+  /**
+   * Render offline toast notification
+   */
+  renderOfflineToast(containerElement) {
+    containerElement.innerHTML = `
+      <div id="offlineToast" class="offline-toast" style="display:none;">
+        You are offline. New items will be queued.
+      </div>
+    `;
+    
+    // Set the offline indicator element in the API
+    const offlineToast = containerElement.querySelector('#offlineToast');
+    window.memoriaAPI.setOfflineIndicator(offlineToast);
+    
+    return offlineToast;
   }
 }
 

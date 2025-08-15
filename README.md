@@ -294,6 +294,34 @@ The web interface includes a built-in voice dictation feature:
 - Respects AUTH_TOKEN authentication
 - Visual feedback during recording and transcription
 
+## PWA and Offline Support
+
+Memoria is a fully-featured Progressive Web App (PWA) with offline capabilities:
+
+### Installation
+- **Mobile**: Add to Home Screen from your browser
+- **Desktop**: Use the "Install App" button or browser's install prompt
+- **Works offline**: Core functionality available when disconnected
+
+### Offline Features
+- **Cached pages**: All app pages (Hub, Memories, Agenda, Backup, Settings) work offline
+- **Offline creation**: Create memories and tasks when offline - they're automatically queued
+- **Background sync**: Queued items are sent to server when connection is restored
+- **Visual feedback**: 
+  - Orange toast notification when offline: "You are offline. New items will be queued"
+  - Queue indicator in header shows pending items count
+  - Success messages when items are queued vs. saved immediately
+
+### Technical Details
+- **Service Worker**: Enhanced caching and request queueing using IndexedDB
+- **Request interception**: POST requests to `/memories` and `/tasks` are queued when offline
+- **Auto-retry**: Queued requests are automatically retried when online
+- **No data loss**: Items created offline are safely stored until they can be synchronized
+
+### Browser Support
+- **Recommended**: Chrome, Edge, Safari (modern versions)
+- **Service Worker required**: For offline functionality
+- **IndexedDB required**: For offline request queueing
 ## Don’t commit secrets/data
 - Keep `.env` and `server/app.db` out of git (already in `.gitignore`).
 - Commit `.env.example` only.
