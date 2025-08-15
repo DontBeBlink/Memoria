@@ -1,7 +1,7 @@
 import sqlite3
 from typing import List, Optional, Any, Dict
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "app.db")
 
@@ -33,6 +33,26 @@ def init_db():
   conn.commit()
   conn.close()
 
+
+def _normalize_due_to_utc(due: Optional[str]) -> Optional[str]:
+  """Convert an ISO datetime (naive or with offset) to an ISO UTC string.
+     If due is None or empty, returns None.
+  """
+  if not due:
+    return None
+  try:
+    dt = datetime.fromisoformat(due)
+  except Exception:
+    return due
+
+  # If naive, assume local timezone
+  if dt.tzinfo is None:
+    local_tz = datetime.now().astimezone().tzinfo
+    dt = dt.replace(tzinfo=local_tz)
+
+  # Convert to UTC and return ISO string
+  return dt.astimezone(timezone.utc).isoformat()
+
 def _tags_from(text: str) -> str:
   import re
   ats = re.findall(r'@\w+', text) or []
@@ -55,10 +75,11 @@ def add_memory(text: str) -> Dict[str, Any]:
 def add_task(title: str, due: Optional[str]) -> Dict[str, Any]:
   created = datetime.utcnow().isoformat()
   tags = _tags_from(title)
+  due_norm = _normalize_due_to_utc(due)
   conn = _connect()
   cur = conn.cursor()
   cur.execute("INSERT INTO tasks(title, due, done, created, tags) VALUES (?, ?, 0, ?, ?)",
-              (title, due, created, tags))
+              (title, due_norm, created, tags))
   task_id = cur.lastrowid
   conn.commit()
   row = cur.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
@@ -126,12 +147,31 @@ def list_memories(limit: int = 100, offset: int = 0, query: Optional[str] = None
     "total": total
   }
 
-def list_tasks(open_only: bool = False, limit: int = 200):
+def list_tasks(open_only: bool = False, limit: int = 200, start: Optional[str] = None, end: Optional[str] = None):
   conn = _connect()
+  
+  # Build query with optional date range filtering
+  conditions = []
+  params = []
+  
   if open_only:
-    rows = conn.execute("SELECT * FROM tasks WHERE done=0 ORDER BY COALESCE(due, '9999') ASC, id DESC LIMIT ?", (limit,)).fetchall()
-  else:
-    rows = conn.execute("SELECT * FROM tasks ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    conditions.append("done=0")
+  
+  if start:
+    conditions.append("due >= ?")
+    params.append(start)
+    
+  if end:
+    conditions.append("due <= ?")
+    params.append(end)
+  
+  where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+  order_clause = " ORDER BY COALESCE(due, '9999') ASC, id DESC" if open_only else " ORDER BY id DESC"
+  
+  params.append(limit)
+  query = f"SELECT * FROM tasks{where_clause}{order_clause} LIMIT ?"
+  
+  rows = conn.execute(query, params).fetchall()
   conn.close()
   return [dict(r) for r in rows]
 
@@ -211,10 +251,11 @@ def import_task(task_data: Dict[str, Any], overwrite: bool = False) -> Dict[str,
   try:
     if existing and overwrite:
       # Update existing task
+      due_norm = _normalize_due_to_utc(task_data.get('due'))
       cur.execute("""UPDATE tasks 
                      SET title=?, due=?, done=?, created=?, tags=?, notified_at=?
                      WHERE id=?""", 
-                  (task_data['title'], task_data.get('due'), 
+                  (task_data['title'], due_norm, 
                    task_data.get('done', 0), task_data['created'],
                    task_data.get('tags', ''), task_data.get('notified_at'),
                    task_data['id']))
@@ -223,9 +264,10 @@ def import_task(task_data: Dict[str, Any], overwrite: bool = False) -> Dict[str,
       return {"status": "updated"}
     else:
       # Insert new task with specific ID
+      due_norm = _normalize_due_to_utc(task_data.get('due'))
       cur.execute("""INSERT INTO tasks(id, title, due, done, created, tags, notified_at) 
                      VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                  (task_data['id'], task_data['title'], task_data.get('due'),
+                  (task_data['id'], task_data['title'], due_norm,
                    task_data.get('done', 0), task_data['created'],
                    task_data.get('tags', ''), task_data.get('notified_at')))
       conn.commit()
@@ -321,7 +363,7 @@ def update_task(task_id: int, **fields) -> Optional[Dict[str, Any]]:
       values.append(_tags_from(value))
     elif field == "due":
       set_clauses.append("due = ?")
-      values.append(value)
+      values.append(_normalize_due_to_utc(value))
     elif field == "done":
       set_clauses.append("done = ?")
       values.append(1 if value else 0)
