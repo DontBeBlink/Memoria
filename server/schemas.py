@@ -12,6 +12,7 @@ class TaskIn(BaseModel):
     due: Optional[str] = None  # ISO datetime string
     rrule: Optional[str] = None  # RFC 5545 RRULE string
     priority: Optional[str] = Field(None, pattern=r"^(low|medium|high)$")  # Priority level
+    duration: Optional[int] = None  # Duration in minutes
 
 class TaskPatch(BaseModel):
     title: Optional[str] = Field(None, min_length=1)
@@ -19,6 +20,7 @@ class TaskPatch(BaseModel):
     done: Optional[bool] = None
     rrule: Optional[str] = None  # RFC 5545 RRULE string
     priority: Optional[str] = Field(None, pattern=r"^(low|medium|high)$")  # Priority level
+    duration: Optional[int] = None  # Duration in minutes
 
 class CaptureIn(BaseModel):
     text: str = Field(..., min_length=1)
@@ -39,6 +41,7 @@ class Task(BaseModel):
     notified_at: Optional[str] = None
     rrule: Optional[str] = None
     priority: Optional[str] = None
+    duration: Optional[int] = None
 
 class TranscriptionResponse(BaseModel):
     text: str

@@ -151,9 +151,9 @@ def post_task(task: TaskIn, auth=Depends(require_auth)):
     if extracted_due:
       due = extracted_due
       # Use cleaned title without date information
-      return storage.add_task(cleaned_title, due, task.rrule, task.priority)
+      return storage.add_task(cleaned_title, due, task.rrule, task.priority, task.duration)
   
-  return storage.add_task(task.title, due, task.rrule, task.priority)
+  return storage.add_task(task.title, due, task.rrule, task.priority, task.duration)
 
 @app.patch("/tasks/{task_id}")
 def patch_task(task_id: str, task: TaskPatch, auth=Depends(require_auth)):
@@ -182,6 +182,8 @@ def patch_task(task_id: str, task: TaskPatch, auth=Depends(require_auth)):
     fields["rrule"] = task.rrule
   if task.priority is not None:
     fields["priority"] = task.priority
+  if task.duration is not None:
+    fields["duration"] = task.duration
   
   if not fields:
     raise HTTPException(status_code=400, detail="No fields to update")

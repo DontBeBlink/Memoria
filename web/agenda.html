@@ -187,6 +187,24 @@
       color: #9ca3af;
       margin-left: 8px;
     }
+    .timeline-task.has-duration {
+      border: 2px solid;
+      border-color: inherit;
+    }
+    .timeline-task.conflict {
+      border-color: #ef4444;
+      background: #1f1a1a;
+      border-style: dashed;
+    }
+    .duration-indicator {
+      background: rgba(0,0,0,0.3);
+      color: #9ca3af;
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 2px;
+      margin-left: 8px;
+      display: inline-block;
+    }
     
     /* Monthly calendar styles */
     .calendar-grid {
@@ -270,6 +288,7 @@
         <form id="taskForm">
           <div class="row">
             <input id="taskText" type="text" placeholder="Add a task... (try 'Meeting Mon 9a' or 'Call client in 2h')" required style="flex:1;" />
+            <input id="durationInput" type="text" placeholder="Duration (e.g. 1h, 30m)" style="padding:10px 12px; border-radius:8px; background:#0f172a; color:#e5e7eb; border:1px solid #374151; min-width:120px;" />
             <select id="prioritySelect" style="padding:10px 12px; border-radius:8px; background:#0f172a; color:#e5e7eb; border:1px solid #374151; min-width:100px;">
               <option value="low">🟢 Low</option>
               <option value="medium" selected>🟡 Medium</option>
@@ -391,6 +410,7 @@
     // Initialize page elements
     const taskForm = document.getElementById('taskForm');
     const taskText = document.getElementById('taskText');
+    const durationInput = document.getElementById('durationInput');
     const prioritySelect = document.getElementById('prioritySelect');
     const repeatToggle = document.getElementById('repeatToggle');
     const recurrenceOptions = document.getElementById('recurrenceOptions');
@@ -459,6 +479,51 @@
       const result = new Date(date);
       result.setTime(result.getTime() + (hours * 60 * 60 * 1000));
       return result;
+    }
+    
+    // Duration parsing functions
+    function parseDuration(durationStr) {
+      if (!durationStr || !durationStr.trim()) return null;
+      
+      const str = durationStr.toLowerCase().trim();
+      let totalMinutes = 0;
+      
+      // Handle formats like "1h 30m", "90m", "1.5h", "30 minutes"
+      const patterns = [
+        /(\d+(?:\.\d+)?)\s*h(?:ours?)?/g,  // hours
+        /(\d+)\s*m(?:in(?:utes?)?)?/g,      // minutes
+      ];
+      
+      // Extract hours
+      const hourMatch = patterns[0].exec(str);
+      if (hourMatch) {
+        totalMinutes += parseFloat(hourMatch[1]) * 60;
+      }
+      
+      // Reset regex and extract minutes
+      patterns[1].lastIndex = 0;
+      const minuteMatch = patterns[1].exec(str);
+      if (minuteMatch) {
+        totalMinutes += parseInt(minuteMatch[1]);
+      }
+      
+      // If no patterns matched, try parsing as pure number (assume minutes)
+      if (totalMinutes === 0) {
+        const numMatch = /^(\d+)$/.exec(str);
+        if (numMatch) {
+          totalMinutes = parseInt(numMatch[1]);
+        }
+      }
+      
+      return totalMinutes > 0 ? totalMinutes : null;
+    }
+    
+    function formatDuration(minutes) {
+      if (!minutes) return '';
+      if (minutes < 60) return `${minutes}m`;
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     }
     
     function getWeekStart(date) {
@@ -576,6 +641,14 @@
         const priorityChoice = prompt('Edit priority (high, medium, low):', currentPriority);
         if (priorityChoice !== null && ['high', 'medium', 'low'].includes(priorityChoice.toLowerCase())) {
           updates.priority = priorityChoice.toLowerCase();
+        }
+        
+        // Ask about duration
+        const currentDuration = task.duration ? formatDuration(task.duration) : '';
+        const durationChoice = prompt('Edit duration (e.g., 1h, 30m, 1h 30m, leave empty for no duration):', currentDuration);
+        if (durationChoice !== null) {
+          const newDuration = parseDuration(durationChoice);
+          updates.duration = newDuration;
         }
         
         // Handle recurrence editing for recurring tasks
@@ -721,7 +794,13 @@
       
       const meta = document.createElement('div');
       meta.className = 'tags';
-      const dueText = task.due ? new Date(task.due).toLocaleString() : 'No due date';
+      let dueText = task.due ? new Date(task.due).toLocaleString() : 'No due date';
+      
+      // Add duration information
+      if (task.duration) {
+        dueText += ` • ${formatDuration(task.duration)}`;
+      }
+      
       meta.textContent = dueText + (task.tags ? ' ' + task.tags : '');
       
       left.append(title, meta);
@@ -738,6 +817,12 @@
       taskElement.className = `timeline-task task-${task.priority || 'medium'}-priority`;
       taskElement.draggable = true;
       taskElement.dataset.taskId = task.id;
+      
+      // Set height based on duration
+      const duration = task.duration || 30; // Default 30 minutes if no duration
+      const heightPixels = (duration / 60) * 60; // 60px per hour
+      taskElement.style.height = `${Math.max(heightPixels, 30)}px`; // Minimum 30px height
+      taskElement.style.minHeight = '30px';
       
       const content = document.createElement('div');
       content.className = 'task-content';
@@ -759,7 +844,17 @@
       
       const timeElement = document.createElement('div');
       timeElement.className = 'task-time';
-      timeElement.textContent = new Date(task.due).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const startTime = new Date(task.due).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      let timeText = startTime;
+      
+      // Add duration info and end time if duration is specified
+      if (task.duration) {
+        const endTime = new Date(new Date(task.due).getTime() + task.duration * 60000);
+        const endTimeStr = endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        timeText = `${startTime} - ${endTimeStr} (${formatDuration(task.duration)})`;
+      }
+      
+      timeElement.textContent = timeText;
       
       taskElement.appendChild(content);
       taskElement.appendChild(timeElement);
@@ -1339,14 +1434,21 @@
       // Get priority
       const priority = prioritySelect.value;
       
+      // Get duration
+      const duration = parseDuration(durationInput.value);
+      
       try {
         const taskData = { title, priority };
         if (rrule) {
           taskData.rrule = rrule;
         }
+        if (duration) {
+          taskData.duration = duration;
+        }
         
         await window.memoriaAPI.request('/tasks', 'POST', taskData);
         taskText.value = '';
+        durationInput.value = '';
         prioritySelect.value = 'medium'; // Reset to default
         recurrenceType.value = '';
         customRrule.value = '';
