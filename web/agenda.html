@@ -307,6 +307,68 @@
       background: #2563eb;
       border-color: #3b82f6;
     }
+    
+    /* Debug overlay styles */
+    .debug-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 100;
+      background: rgba(255, 0, 0, 0.05);
+    }
+    .debug-guide {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(255, 255, 0, 0.8);
+      z-index: 101;
+    }
+    .debug-guide::before {
+      content: attr(data-time);
+      position: absolute;
+      left: 4px;
+      top: -10px;
+      font-size: 10px;
+      color: #ffff00;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-family: monospace;
+    }
+    .debug-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #ffffff;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+      z-index: 1000;
+      min-width: 200px;
+    }
+    .debug-panel h4 {
+      margin: 0 0 8px 0;
+      color: #ffff00;
+      font-size: 12px;
+    }
+    .debug-panel .metric {
+      margin: 2px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+    .debug-panel .metric-label {
+      color: #cccccc;
+    }
+    .debug-panel .metric-value {
+      color: #00ff00;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -516,6 +578,10 @@
     let showingUnscheduled = false;
     let timelineMode = false;
     
+    // Debug mode state
+    const isDebugMode = new URLSearchParams(window.location.search).has('debug');
+    let debugOverlayVisible = false;
+    
     // Task templates
     const taskTemplates = {
       memoria: {
@@ -658,6 +724,32 @@
     // Initialize clock and update every second
     updateClock();
     setInterval(updateClock, 1000);
+    
+    // Debug mode keyboard handler
+    if (isDebugMode) {
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'D' || e.key === 'd') {
+          e.preventDefault();
+          toggleDebugOverlay();
+        }
+      });
+      
+      // Debug mode resize handler
+      window.addEventListener('resize', () => {
+        if (debugOverlayVisible) {
+          // Reset metrics cache and refresh debug overlay
+          timelineMetrics = null;
+          setTimeout(() => {
+            toggleDebugOverlay(); // Hide
+            setTimeout(() => {
+              toggleDebugOverlay(); // Show with updated metrics
+            }, 50);
+          }, 100);
+        }
+      });
+      
+      console.log('🐛 Debug mode active! Press D to toggle debug overlay.');
+    }
 
     // Task management functions
     async function loadTasks(start, end) {
@@ -969,6 +1061,226 @@
       return timelineMetrics;
     }
     
+    // Debug overlay functions
+    function createDebugOverlay() {
+      const timelineContent = document.querySelector('.timeline-content');
+      if (!timelineContent) return null;
+      
+      const overlay = document.createElement('div');
+      overlay.className = 'debug-overlay';
+      overlay.id = 'debugOverlay';
+      
+      const metrics = getTimelineMetrics();
+      
+      // Create guides every 30 minutes from 6 AM to 11 PM
+      for (let hour = 6; hour <= 23; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+          if (hour === 23 && minute > 0) break; // Don't go past 11 PM
+          
+          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          const slotIndex = hour - 6;
+          const position = (slotIndex * metrics.slotHeight) + (minute * metrics.pxPerMinute);
+          
+          const guide = document.createElement('div');
+          guide.className = 'debug-guide';
+          guide.setAttribute('data-time', timeString);
+          guide.style.top = `${position}px`;
+          
+          overlay.appendChild(guide);
+        }
+      }
+      
+      return overlay;
+    }
+    
+    function createDebugPanel() {
+      const metrics = getTimelineMetrics();
+      const now = new Date();
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      const panel = document.createElement('div');
+      panel.className = 'debug-panel';
+      panel.id = 'debugPanel';
+      
+      panel.innerHTML = `
+        <h4>📊 Debug Timeline Metrics</h4>
+        <div class="metric">
+          <span class="metric-label">pxPerMinute:</span>
+          <span class="metric-value">${metrics.pxPerMinute.toFixed(3)}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">slotHeight:</span>
+          <span class="metric-value">${metrics.slotHeight.toFixed(1)}px</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">dayStart:</span>
+          <span class="metric-value">06:00</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">dayEnd:</span>
+          <span class="metric-value">23:00</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">timezone:</span>
+          <span class="metric-value">${timezone}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">devicePixelRatio:</span>
+          <span class="metric-value">${window.devicePixelRatio}</span>
+        </div>
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #444;">
+          <div style="color: #ffff00; font-size: 10px;">Press D to toggle</div>
+        </div>
+      `;
+      
+      return panel;
+    }
+    
+    function toggleDebugOverlay() {
+      if (!isDebugMode) return;
+      
+      debugOverlayVisible = !debugOverlayVisible;
+      
+      // Remove existing debug elements
+      const existingOverlay = document.getElementById('debugOverlay');
+      const existingPanel = document.getElementById('debugPanel');
+      if (existingOverlay) existingOverlay.remove();
+      if (existingPanel) existingPanel.remove();
+      
+      if (debugOverlayVisible) {
+        // Add debug overlay to timeline
+        const timelineContent = document.querySelector('.timeline-content');
+        if (timelineContent) {
+          const overlay = createDebugOverlay();
+          if (overlay) {
+            timelineContent.appendChild(overlay);
+          }
+        }
+        
+        // Add debug panel to body
+        const panel = createDebugPanel();
+        document.body.appendChild(panel);
+        
+        // Run verification
+        setTimeout(verifyLayout, 100);
+      }
+    }
+    
+    function verifyLayout() {
+      if (!isDebugMode || !debugOverlayVisible) return;
+      
+      const timelineContent = document.querySelector('.timeline-content');
+      if (!timelineContent) {
+        console.log('🔍 verifyLayout: No timeline content found');
+        return;
+      }
+      
+      const metrics = getTimelineMetrics();
+      const tasks = timelineContent.querySelectorAll('.timeline-task');
+      
+      let failures = 0;
+      const results = [];
+      
+      console.log('🔍 verifyLayout: Checking positioning accuracy...');
+      console.log(`📏 Using metrics: ${metrics.pxPerMinute.toFixed(3)}px/min, ${metrics.slotHeight.toFixed(1)}px/hour`);
+      
+      tasks.forEach((taskElement, index) => {
+        const taskId = taskElement.dataset.taskId;
+        const rect = taskElement.getBoundingClientRect();
+        const timelineRect = timelineContent.getBoundingClientRect();
+        
+        // Get current position relative to timeline content
+        const currentTop = rect.top - timelineRect.top;
+        const currentHeight = rect.height;
+        
+        // Try to find the task data to calculate expected position
+        // We'll need to get the task from the current tasks array
+        // For now, let's extract the time from the task element's text content
+        const timeElement = taskElement.querySelector('.task-time');
+        if (!timeElement) {
+          console.log(`⚠️  Task ${index}: No time element found`);
+          return;
+        }
+        
+        const timeText = timeElement.textContent;
+        const timeMatch = timeText.match(/(\d{1,2}):(\d{2})/);
+        if (!timeMatch) {
+          console.log(`⚠️  Task ${index}: Could not parse time from "${timeText}"`);
+          return;
+        }
+        
+        const hour = parseInt(timeMatch[1]);
+        const minute = parseInt(timeMatch[2]);
+        
+        // Calculate expected position
+        const slotIndex = hour - 6; // Timeline starts at 6 AM
+        const expectedTop = (slotIndex * metrics.slotHeight) + (minute * metrics.pxPerMinute);
+        
+        // Check position accuracy
+        const topDiff = Math.abs(currentTop - expectedTop);
+        const topAccurate = topDiff < 1.0;
+        
+        // For height, try to extract duration from the time text
+        let expectedHeight = null;
+        let heightAccurate = true; // Default to true if we can't check
+        
+        const durationMatch = timeText.match(/\((\d+)h?\s*(\d*)m?\)/);
+        if (durationMatch) {
+          let durationMinutes = 0;
+          if (durationMatch[1] && durationMatch[2]) {
+            // Format like "(1h 30m)"
+            durationMinutes = parseInt(durationMatch[1]) * 60 + parseInt(durationMatch[2]);
+          } else if (durationMatch[1]) {
+            // Format like "(30m)" or "(1h)"
+            if (timeText.includes('h')) {
+              durationMinutes = parseInt(durationMatch[1]) * 60;
+            } else {
+              durationMinutes = parseInt(durationMatch[1]);
+            }
+          }
+          
+          if (durationMinutes > 0) {
+            expectedHeight = Math.max(durationMinutes * metrics.pxPerMinute, 20);
+            const heightDiff = Math.abs(currentHeight - expectedHeight);
+            heightAccurate = heightDiff < 1.0;
+          }
+        }
+        
+        const result = {
+          taskId: taskId || `task-${index}`,
+          time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+          currentTop: currentTop.toFixed(1),
+          expectedTop: expectedTop.toFixed(1),
+          topDiff: topDiff.toFixed(1),
+          topAccurate,
+          currentHeight: currentHeight.toFixed(1),
+          expectedHeight: expectedHeight ? expectedHeight.toFixed(1) : 'N/A',
+          heightAccurate
+        };
+        
+        results.push(result);
+        
+        if (!topAccurate || !heightAccurate) {
+          failures++;
+          console.log(`❌ Task ${result.taskId} (${result.time}): Position accuracy failed`);
+          console.log(`   Top: ${result.currentTop}px (expected ${result.expectedTop}px, diff ${result.topDiff}px)`);
+          if (expectedHeight) {
+            console.log(`   Height: ${result.currentHeight}px (expected ${result.expectedHeight}px)`);
+          }
+        } else {
+          console.log(`✅ Task ${result.taskId} (${result.time}): Position accurate`);
+        }
+      });
+      
+      console.log(`🎯 verifyLayout: ${failures} failures out of ${results.length} tasks`);
+      
+      if (failures === 0) {
+        console.log('🎉 All timeline tasks are positioned accurately!');
+      }
+      
+      return { failures, total: results.length, results };
+    }
+    
     // Timeline drag and drop functions
     function createTimelineTask(task) {
       const taskElement = document.createElement('div');
@@ -1152,6 +1464,34 @@
             contentColumn.appendChild(taskElement);
           }
         }
+      }
+      
+      // Run layout verification in debug mode
+      if (isDebugMode) {
+        setTimeout(verifyLayout, 100);
+      }
+      
+      // Refresh debug overlay if visible
+      if (isDebugMode && debugOverlayVisible) {
+        setTimeout(() => {
+          // Remove existing debug elements from this view
+          const existingOverlay = document.getElementById('debugOverlay');
+          if (existingOverlay) existingOverlay.remove();
+          
+          // Add new debug overlay
+          const overlay = createDebugOverlay();
+          if (overlay) {
+            contentColumn.appendChild(overlay);
+          }
+          
+          // Update debug panel
+          const existingPanel = document.getElementById('debugPanel');
+          if (existingPanel) {
+            existingPanel.remove();
+            const panel = createDebugPanel();
+            document.body.appendChild(panel);
+          }
+        }, 50);
       }
     }
     
