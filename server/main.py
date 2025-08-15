@@ -91,15 +91,19 @@ def get_icon(icon_name: str):
   raise HTTPException(status_code=404, detail="Icon not found")
 
 @app.get("/memories")
-def get_memories(q: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None, auth=Depends(require_auth)):
-  # Determine if we're using new functionality (pagination/search)
-  using_new_features = q is not None or limit is not None or offset is not None
+def get_memories(q: Optional[str] = None, tags: Optional[str] = None, people: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None, auth=Depends(require_auth)):
+  # Determine if we're using new functionality (pagination/search/filters)
+  using_new_features = q is not None or limit is not None or offset is not None or tags is not None or people is not None
   
   # Set defaults
   actual_limit = limit if limit is not None else (50 if using_new_features else 100)
   actual_offset = offset if offset is not None else 0
   
-  result = storage.list_memories(limit=actual_limit, offset=actual_offset, query=q)
+  # Parse CSV parameters
+  tags_list = [tag.strip() for tag in tags.split(',')] if tags else None
+  people_list = [person.strip() for person in people.split(',')] if people else None
+  
+  result = storage.list_memories(limit=actual_limit, offset=actual_offset, query=q, tags=tags_list, people=people_list)
   
   # For backward compatibility, if no new parameters are provided, return just the items
   if not using_new_features:
