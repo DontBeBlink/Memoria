@@ -128,7 +128,7 @@
       border-left: 2px solid #374151;
       min-height: calc(18 * 61px); /* Dynamic calculation based on hour slots */
     }
-    .time-slot {
+    .time-slot, .hour-line {
       height: 60px;
       border-bottom: 1px solid #374151;
       position: relative;
@@ -137,7 +137,7 @@
       padding: 4px 8px;
       transition: background-color 0.2s;
     }
-    .time-slot[data-hour] {
+    .time-slot[data-hour], .hour-line[data-hour] {
       /* Add data-hour attribute for DOM measurement */
     }
     .time-slot:hover {
@@ -147,7 +147,7 @@
       background-color: #2563eb !important;
       border: 2px dashed #60a5fa;
     }
-    .time-label {
+    .time-label, .hour-line {
       font-size: 12px;
       color: #9ca3af;
       text-align: right;
@@ -158,10 +158,10 @@
       justify-content: flex-end;
       border-bottom: 1px solid #374151;
     }
-    .time-label[data-hour] {
+    .time-label[data-hour], .hour-line[data-hour] {
       /* Add data-hour attribute for DOM measurement */
     }
-    .timeline-task {
+    .timeline-task, .task-block {
       position: absolute;
       left: 8px;
       right: 8px;
@@ -1028,20 +1028,22 @@
     let timelineMetrics = null;
     
     function measureTimelineMetrics() {
-      // Find the first hour slot in the timeline to measure actual rendered dimensions
-      const firstSlot = document.querySelector('.time-slot[data-hour]');
-      if (!firstSlot) {
-        console.error('No timeline slots found for measurement');
+      // Find hour slots in the timeline to measure actual rendered dimensions
+      const hourSlots = document.querySelectorAll('.hour-line[data-hour]');
+      if (hourSlots.length < 2) {
+        console.error('Need at least 2 timeline slots for accurate measurement');
         return { pxPerMinute: 1, slotHeight: 61 }; // Fallback
       }
       
-      // Measure actual rendered height including borders
-      const rect = firstSlot.getBoundingClientRect();
-      const computedStyle = getComputedStyle(firstSlot);
-      const borderBottom = parseFloat(computedStyle.borderBottomWidth) || 0;
+      // Measure distance between consecutive hour lines for precise slot height
+      const firstSlot = hourSlots[0];
+      const secondSlot = hourSlots[1];
       
-      // Full slot height including border
-      const actualSlotHeight = rect.height + borderBottom;
+      const firstRect = firstSlot.getBoundingClientRect();
+      const secondRect = secondSlot.getBoundingClientRect();
+      
+      // Calculate actual slot height by measuring distance between slot tops
+      const actualSlotHeight = secondRect.top - firstRect.top;
       
       // Calculate pixels per minute from measured hour slot
       const pxPerMinute = actualSlotHeight / 60;
@@ -1073,13 +1075,18 @@
       const metrics = getTimelineMetrics();
       
       // Create guides every 30 minutes from 6 AM to 11 PM
+      // Use precise positioning based on the actual measured slot heights
       for (let hour = 6; hour <= 23; hour++) {
         for (let minute = 0; minute < 60; minute += 30) {
           if (hour === 23 && minute > 0) break; // Don't go past 11 PM
           
           const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-          const slotIndex = hour - 6;
-          const position = (slotIndex * metrics.slotHeight) + (minute * metrics.pxPerMinute);
+          
+          // Calculate position using the exact same logic as task positioning
+          const slotIndex = hour - 6; // Timeline starts at 6 AM
+          const hourTop = slotIndex * metrics.slotHeight;
+          const minuteOffset = minute * metrics.pxPerMinute;
+          const position = hourTop + minuteOffset;
           
           const guide = document.createElement('div');
           guide.className = 'debug-guide';
@@ -1169,14 +1176,14 @@
     function verifyLayout() {
       if (!isDebugMode || !debugOverlayVisible) return;
       
-      const timelineContent = document.querySelector('.timeline-content');
+      const timelineContent = document.querySelector('#agenda-timeline .timeline-content');
       if (!timelineContent) {
         console.log('🔍 verifyLayout: No timeline content found');
         return;
       }
       
       const metrics = getTimelineMetrics();
-      const tasks = timelineContent.querySelectorAll('.timeline-task');
+      const tasks = timelineContent.querySelectorAll('.task-block[data-id]');
       
       let failures = 0;
       const results = [];
@@ -1185,7 +1192,15 @@
       console.log(`📏 Using metrics: ${metrics.pxPerMinute.toFixed(3)}px/min, ${metrics.slotHeight.toFixed(1)}px/hour`);
       
       tasks.forEach((taskElement, index) => {
-        const taskId = taskElement.dataset.taskId;
+        const taskId = taskElement.dataset.id;
+        const startISO = taskElement.dataset.start;
+        const endISO = taskElement.dataset.end;
+        
+        if (!startISO) {
+          console.log(`⚠️  Task ${taskId}: No start time data attribute found`);
+          return;
+        }
+        
         const rect = taskElement.getBoundingClientRect();
         const timelineRect = timelineContent.getBoundingClientRect();
         
@@ -1193,51 +1208,29 @@
         const currentTop = rect.top - timelineRect.top;
         const currentHeight = rect.height;
         
-        // Try to find the task data to calculate expected position
-        // We'll need to get the task from the current tasks array
-        // For now, let's extract the time from the task element's text content
-        const timeElement = taskElement.querySelector('.task-time');
-        if (!timeElement) {
-          console.log(`⚠️  Task ${index}: No time element found`);
-          return;
-        }
+        // Parse start time and calculate expected position
+        const startTime = new Date(startISO);
+        const hour = startTime.getHours();
+        const minute = startTime.getMinutes();
         
-        const timeText = timeElement.textContent;
-        const timeMatch = timeText.match(/(\d{1,2}):(\d{2})/);
-        if (!timeMatch) {
-          console.log(`⚠️  Task ${index}: Could not parse time from "${timeText}"`);
-          return;
-        }
-        
-        const hour = parseInt(timeMatch[1]);
-        const minute = parseInt(timeMatch[2]);
-        
-        // Calculate expected position
+        // Calculate expected position using same logic as task positioning
         const slotIndex = hour - 6; // Timeline starts at 6 AM
-        const expectedTop = (slotIndex * metrics.slotHeight) + (minute * metrics.pxPerMinute);
+        const hourTop = slotIndex * metrics.slotHeight;
+        const minuteOffset = minute * metrics.pxPerMinute;
+        const expectedTop = hourTop + minuteOffset;
         
         // Check position accuracy
         const topDiff = Math.abs(currentTop - expectedTop);
         const topAccurate = topDiff < 1.0;
         
-        // For height, try to extract duration from the time text
+        // Check height accuracy if end time is available
         let expectedHeight = null;
-        let heightAccurate = true; // Default to true if we can't check
+        let heightAccurate = true;
         
-        const durationMatch = timeText.match(/\((\d+)h?\s*(\d*)m?\)/);
-        if (durationMatch) {
-          let durationMinutes = 0;
-          if (durationMatch[1] && durationMatch[2]) {
-            // Format like "(1h 30m)"
-            durationMinutes = parseInt(durationMatch[1]) * 60 + parseInt(durationMatch[2]);
-          } else if (durationMatch[1]) {
-            // Format like "(30m)" or "(1h)"
-            if (timeText.includes('h')) {
-              durationMinutes = parseInt(durationMatch[1]) * 60;
-            } else {
-              durationMinutes = parseInt(durationMatch[1]);
-            }
-          }
+        if (endISO) {
+          const endTime = new Date(endISO);
+          const durationMs = endTime.getTime() - startTime.getTime();
+          const durationMinutes = durationMs / (1000 * 60);
           
           if (durationMinutes > 0) {
             expectedHeight = Math.max(durationMinutes * metrics.pxPerMinute, 20);
@@ -1247,7 +1240,7 @@
         }
         
         const result = {
-          taskId: taskId || `task-${index}`,
+          taskId: taskId,
           time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
           currentTop: currentTop.toFixed(1),
           expectedTop: expectedTop.toFixed(1),
@@ -1284,9 +1277,19 @@
     // Timeline drag and drop functions
     function createTimelineTask(task) {
       const taskElement = document.createElement('div');
-      taskElement.className = `timeline-task task-${task.priority || 'medium'}-priority`;
+      taskElement.className = `timeline-task task-block task-${task.priority || 'medium'}-priority`;
       taskElement.draggable = true;
       taskElement.dataset.taskId = task.id;
+      taskElement.dataset.id = task.id;
+      
+      // Add data-start and data-end attributes for layout verification
+      if (task.due) {
+        taskElement.dataset.start = new Date(task.due).toISOString();
+        if (task.duration) {
+          const endTime = new Date(new Date(task.due).getTime() + task.duration * 60000);
+          taskElement.dataset.end = endTime.toISOString();
+        }
+      }
       
       // Set height based on duration using measured metrics
       const duration = task.duration || 30; // Default 30 minutes if no duration
@@ -1401,6 +1404,7 @@
       // Create timeline container
       const timelineContainer = document.createElement('div');
       timelineContainer.className = 'timeline-container';
+      timelineContainer.id = 'agenda-timeline';
       
       const hoursColumn = document.createElement('div');
       hoursColumn.className = 'timeline-hours';
@@ -1411,13 +1415,13 @@
       // Generate time slots (6 AM to 11 PM)
       for (let hour = 6; hour <= 23; hour++) {
         const timeLabel = document.createElement('div');
-        timeLabel.className = 'time-label';
+        timeLabel.className = 'time-label hour-line';
         timeLabel.dataset.hour = hour; // Add data-hour for measurement
         timeLabel.textContent = `${hour % 12 === 0 ? 12 : hour % 12}${hour < 12 ? 'AM' : 'PM'}`;
         hoursColumn.appendChild(timeLabel);
         
         const timeSlot = document.createElement('div');
-        timeSlot.className = 'time-slot';
+        timeSlot.className = 'time-slot hour-line';
         timeSlot.dataset.hour = hour; // Add data-hour for measurement
         timeSlot.addEventListener('dragover', handleDragOver);
         timeSlot.addEventListener('drop', handleDrop);
