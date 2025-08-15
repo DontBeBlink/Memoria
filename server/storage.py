@@ -32,15 +32,23 @@ def init_db():
     created TEXT NOT NULL,
     tags TEXT DEFAULT '',
     notified_at TEXT,
-    rrule TEXT
+    rrule TEXT,
+    priority TEXT DEFAULT 'medium'
   )""")
   conn.commit()
-  # Ensure schema migration: add rrule column if it doesn't exist (for older DBs)
+  # Ensure schema migration: add columns if they don't exist (for older DBs)
   cur.execute("PRAGMA table_info(tasks)")
   cols = [r[1] for r in cur.fetchall()]
   if 'rrule' not in cols:
     try:
       cur.execute("ALTER TABLE tasks ADD COLUMN rrule TEXT")
+      conn.commit()
+    except Exception:
+      # If alter fails for any reason, ignore and continue; table may already be correct.
+      pass
+  if 'priority' not in cols:
+    try:
+      cur.execute("ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'medium'")
       conn.commit()
     except Exception:
       # If alter fails for any reason, ignore and continue; table may already be correct.
@@ -87,14 +95,15 @@ def add_memory(text: str) -> Dict[str, Any]:
   conn.close()
   return dict(row)
 
-def add_task(title: str, due: Optional[str], rrule: Optional[str] = None) -> Dict[str, Any]:
+def add_task(title: str, due: Optional[str], rrule: Optional[str] = None, priority: Optional[str] = None) -> Dict[str, Any]:
   created = datetime.utcnow().isoformat()
   tags = _tags_from(title)
   due_norm = _normalize_due_to_utc(due)
+  priority = priority or 'medium'  # Default to medium priority
   conn = _connect()
   cur = conn.cursor()
-  cur.execute("INSERT INTO tasks(title, due, done, created, tags, rrule) VALUES (?, ?, 0, ?, ?, ?)",
-              (title, due_norm, created, tags, rrule))
+  cur.execute("INSERT INTO tasks(title, due, done, created, tags, rrule, priority) VALUES (?, ?, 0, ?, ?, ?, ?)",
+              (title, due_norm, created, tags, rrule, priority))
   task_id = cur.lastrowid
   conn.commit()
   row = cur.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
@@ -496,6 +505,9 @@ def update_task(task_id: int, **fields) -> Optional[Dict[str, Any]]:
       values.append(1 if value else 0)
     elif field == "rrule":
       set_clauses.append("rrule = ?")
+      values.append(value)
+    elif field == "priority":
+      set_clauses.append("priority = ?")
       values.append(value)
   
   if not set_clauses:
