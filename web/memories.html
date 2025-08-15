@@ -68,11 +68,21 @@
     .error-banner.show { display:block; }
     .success-banner { background:#059669; color:white; padding:8px 12px; border-radius:6px; margin:8px 0; display:none; }
     .success-banner.show { display:block; }
+    .offline-toast { 
+      position:fixed; top:72px; right:16px; background:#f59e0b; color:white; 
+      padding:12px 16px; border-radius:6px; font-size:14px; z-index:1000;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .queue-indicator { 
+      background:#f59e0b; color:white; padding:4px 8px; border-radius:12px; 
+      font-size:12px; font-weight:bold; margin-left:8px;
+    }
   </style>
 </head>
 <body>
   <header id="header"></header>
   <div id="authWarningContainer"></div>
+  <div id="offlineToastContainer"></div>
   <main>
     <section>
       <div class="sec-title">
@@ -134,6 +144,10 @@
     });
     
     const authWarning = window.memoriaUI.renderAuthWarning(authContainer);
+    
+    // Render offline toast
+    const offlineContainer = document.getElementById('offlineToastContainer');
+    const offlineToast = window.memoriaUI.renderOfflineToast(offlineContainer);
 
     // Initialize page elements
     const memForm = document.getElementById('memForm');
@@ -538,10 +552,15 @@
       if (!text) return;
       
       try {
-        await window.memoriaAPI.request('/memories', 'POST', { text });
+        const result = await window.memoriaAPI.request('/memories', 'POST', { text });
         memText.value = '';
-        await loadMemories();
-        showSuccessBanner('Memory added successfully');
+        
+        if (result && result.queued) {
+          showSuccessBanner('Memory queued for when online');
+        } else {
+          await loadMemories();
+          showSuccessBanner('Memory added successfully');
+        }
       } catch (error) {
         console.error('Failed to add memory:', error);
         showErrorBanner('Failed to add memory: ' + error.message);
