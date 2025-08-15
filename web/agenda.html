@@ -935,7 +935,7 @@
       
       // Set height based on duration - scale to fit exactly in time slots
       const duration = task.duration || 30; // Default 30 minutes if no duration
-      // Each hour slot is 69px total, with about 60px usable space for content
+      // Each hour slot is 61px total (60px content + 1px border), with 60px usable space for content
       // Scale duration: 60 minutes = 60px usable space
       const heightPixels = Math.max((duration / 60) * 60, 20); // Minimum 20px height for visibility
       taskElement.style.height = `${heightPixels}px`;
@@ -1082,11 +1082,11 @@
             const slotIndex = hour - 6;
             
             // Calculate position using actual time slot dimensions
-            // Each time slot is actually 69px tall (60px + padding/border)
-            const SLOT_HEIGHT = 69; // Actual rendered height per time slot
+            // Each time slot is 61px tall (60px content + 1px border)
+            const SLOT_HEIGHT = 61; // Actual rendered height per time slot (60px + 1px border)
             const hourTop = slotIndex * SLOT_HEIGHT;
-            // Add minute offset within the hour (proportional to available space)
-            const minuteOffset = (minutes / 60) * 60; // Scale minutes to available space in slot
+            // Add minute offset within the hour (proportional to 60px content area)
+            const minuteOffset = (minutes / 60) * 60; // Scale minutes to 60px content area
             const totalTop = hourTop + minuteOffset;
             
             taskElement.style.top = `${totalTop}px`;
