@@ -187,6 +187,77 @@
       color: #9ca3af;
       margin-left: 8px;
     }
+    
+    /* Monthly calendar styles */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: #374151;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .calendar-header {
+      background: #1f2937;
+      padding: 8px 4px;
+      text-align: center;
+      font-weight: 500;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .calendar-day {
+      background: #0f172a;
+      min-height: 100px;
+      padding: 4px;
+      position: relative;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .calendar-day:hover {
+      background: #1f2937;
+    }
+    .calendar-day.today {
+      background: #1e3a8a;
+      border: 2px solid #3b82f6;
+    }
+    .calendar-day.other-month {
+      background: #111827;
+      color: #6b7280;
+    }
+    .calendar-day.other-month:hover {
+      background: #1f2937;
+    }
+    .day-number {
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .day-tasks {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .calendar-task {
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 2px;
+      background: #374151;
+      color: #e5e7eb;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+    .calendar-task.high { background: #dc2626; }
+    .calendar-task.medium { background: #f59e0b; }
+    .calendar-task.low { background: #059669; }
+    .calendar-task-more {
+      font-size: 9px;
+      color: #9ca3af;
+      text-align: center;
+      padding: 1px;
+    }
   </style>
 </head>
 <body>
@@ -241,6 +312,7 @@
       <div class="agenda-tabs">
         <div class="agenda-tab active" data-view="day">📅 Day</div>
         <div class="agenda-tab" data-view="week">📆 Week</div>
+        <div class="agenda-tab" data-view="month">🗓️ Month</div>
       </div>
 
       <!-- Day View -->
@@ -268,6 +340,19 @@
           </div>
         </div>
         <div id="weekContent"></div>
+      </div>
+
+      <!-- Month View -->
+      <div id="monthView" class="agenda-view">
+        <div class="sec-title" style="margin-bottom:16px;">
+          <h3 id="monthTitle">This Month</h3>
+          <div class="row">
+            <button id="prevMonth">&lt;</button>
+            <button id="nextMonth">&gt;</button>
+            <button id="thisMonthBtn">This Month</button>
+          </div>
+        </div>
+        <div id="monthContent"></div>
       </div>
 
       <!-- Quick Plan Section (preserved) -->
@@ -322,12 +407,15 @@
     const tabs = document.querySelectorAll('.agenda-tab');
     const dayView = document.getElementById('dayView');
     const weekView = document.getElementById('weekView');
+    const monthView = document.getElementById('monthView');
     
     // Navigation elements
     const dayTitle = document.getElementById('dayTitle');
     const weekTitle = document.getElementById('weekTitle');
+    const monthTitle = document.getElementById('monthTitle');
     const dayContent = document.getElementById('dayContent');
     const weekContent = document.getElementById('weekContent');
+    const monthContent = document.getElementById('monthContent');
     
     // Day navigation
     const prevDayBtn = document.getElementById('prevDay');
@@ -339,6 +427,11 @@
     const prevWeekBtn = document.getElementById('prevWeek');
     const nextWeekBtn = document.getElementById('nextWeek');
     const thisWeekBtn = document.getElementById('thisWeekBtn');
+    
+    // Month navigation
+    const prevMonthBtn = document.getElementById('prevMonth');
+    const nextMonthBtn = document.getElementById('nextMonth');
+    const thisMonthBtn = document.getElementById('thisMonthBtn');
 
     // Current view state
     let currentView = 'day';
@@ -923,11 +1016,146 @@
       }
     }
 
+    // Month view functions
+    async function renderMonthView() {
+      if (showingUnscheduled) {
+        await renderUnscheduledView();
+        return;
+      }
+      
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      
+      // Get first day of month and calculate the calendar grid
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const startDate = new Date(firstDay);
+      startDate.setDate(startDate.getDate() - firstDay.getDay()); // Start from Sunday
+      
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 41); // 6 weeks * 7 days
+      
+      // Load tasks for the entire month range
+      const start = formatDate(startDate) + 'T00:00:00';
+      const end = formatDate(endDate) + 'T23:59:59';
+      const tasks = await loadTasks(start, end);
+      
+      // Group tasks by date
+      const tasksByDate = {};
+      for (const task of tasks) {
+        if (task.due) {
+          const dateKey = formatDate(new Date(task.due));
+          if (!tasksByDate[dateKey]) tasksByDate[dateKey] = [];
+          tasksByDate[dateKey].push(task);
+        }
+      }
+      
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      
+      monthTitle.textContent = searchQuery ? 
+        `${monthNames[month]} ${year} (filtered)` : 
+        `${monthNames[month]} ${year}`;
+      
+      monthContent.innerHTML = '';
+      
+      // Create calendar grid
+      const calendar = document.createElement('div');
+      calendar.className = 'calendar-grid';
+      
+      // Add day headers
+      const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      for (const header of dayHeaders) {
+        const headerElement = document.createElement('div');
+        headerElement.className = 'calendar-header';
+        headerElement.textContent = header;
+        calendar.appendChild(headerElement);
+      }
+      
+      // Add calendar days
+      const today = formatDate(new Date());
+      const currentDate = new Date(startDate);
+      
+      for (let i = 0; i < 42; i++) { // 6 weeks
+        const dayElement = document.createElement('div');
+        dayElement.className = 'calendar-day';
+        
+        const dateKey = formatDate(currentDate);
+        const isCurrentMonth = currentDate.getMonth() === month;
+        const isToday = dateKey === today;
+        
+        if (!isCurrentMonth) {
+          dayElement.classList.add('other-month');
+        }
+        if (isToday) {
+          dayElement.classList.add('today');
+        }
+        
+        const dayNumber = document.createElement('div');
+        dayNumber.className = 'day-number';
+        dayNumber.textContent = currentDate.getDate();
+        dayElement.appendChild(dayNumber);
+        
+        // Add tasks for this day
+        const dayTasks = tasksByDate[dateKey] || [];
+        if (dayTasks.length > 0) {
+          const tasksContainer = document.createElement('div');
+          tasksContainer.className = 'day-tasks';
+          
+          // Show up to 3 tasks, then "X more"
+          const maxTasks = 3;
+          for (let j = 0; j < Math.min(dayTasks.length, maxTasks); j++) {
+            const task = dayTasks[j];
+            const taskElement = document.createElement('div');
+            taskElement.className = `calendar-task ${task.priority || 'medium'}`;
+            taskElement.textContent = task.title;
+            taskElement.title = task.title; // Full title on hover
+            tasksContainer.appendChild(taskElement);
+          }
+          
+          if (dayTasks.length > maxTasks) {
+            const moreElement = document.createElement('div');
+            moreElement.className = 'calendar-task-more';
+            moreElement.textContent = `+${dayTasks.length - maxTasks} more`;
+            tasksContainer.appendChild(moreElement);
+          }
+          
+          dayElement.appendChild(tasksContainer);
+        }
+        
+        // Click handler to jump to day view
+        dayElement.addEventListener('click', () => {
+          currentView = 'day';
+          window.currentDate = new Date(currentDate);
+          switchView('day');
+        });
+        
+        calendar.appendChild(dayElement);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      monthContent.appendChild(calendar);
+      
+      if (tasks.length === 0) {
+        const message = searchQuery ? 'No tasks found matching your search' : 'No tasks for this month';
+        const messageElement = document.createElement('p');
+        messageElement.className = 'muted';
+        messageElement.textContent = message;
+        messageElement.style.textAlign = 'center';
+        messageElement.style.marginTop = '20px';
+        monthContent.appendChild(messageElement);
+      }
+    }
+
     // Unscheduled view function
     async function renderUnscheduledView() {
       const tasks = await loadTasks();
-      const container = currentView === 'day' ? dayContent : weekContent;
-      const titleElement = currentView === 'day' ? dayTitle : weekTitle;
+      const container = currentView === 'day' ? dayContent : 
+                       currentView === 'week' ? weekContent : monthContent;
+      const titleElement = currentView === 'day' ? dayTitle : 
+                          currentView === 'week' ? weekTitle : monthTitle;
       
       titleElement.textContent = searchQuery ? 
         'Unscheduled Tasks (filtered)' : 
@@ -969,6 +1197,7 @@
       // Update view visibility
       dayView.classList.toggle('active', view === 'day');
       weekView.classList.toggle('active', view === 'week');
+      monthView.classList.toggle('active', view === 'month');
       
       refreshCurrentView();
     }
@@ -976,8 +1205,10 @@
     async function refreshCurrentView() {
       if (currentView === 'day') {
         await renderDayView();
-      } else {
+      } else if (currentView === 'week') {
         await renderWeekView();
+      } else if (currentView === 'month') {
+        await renderMonthView();
       }
     }
 
@@ -1021,6 +1252,21 @@
     thisWeekBtn.onclick = () => {
       currentDate = new Date();
       renderWeekView();
+    };
+    
+    prevMonthBtn.onclick = () => {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      renderMonthView();
+    };
+    
+    nextMonthBtn.onclick = () => {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+      renderMonthView();
+    };
+    
+    thisMonthBtn.onclick = () => {
+      currentDate = new Date();
+      renderMonthView();
     };
 
     // Search functionality
