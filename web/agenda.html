@@ -162,13 +162,15 @@
       background: #0f172a;
       border: 1px solid #374151;
       border-radius: 6px;
-      padding: 8px;
+      padding: 6px 8px;
       cursor: move;
       z-index: 10;
-      min-height: 40px;
+      min-height: 20px;
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      justify-content: center;
       transition: all 0.2s;
+      box-sizing: border-box;
     }
     .timeline-task:hover {
       background: #1f2937;
@@ -931,11 +933,13 @@
       taskElement.draggable = true;
       taskElement.dataset.taskId = task.id;
       
-      // Set height based on duration - 1 minute = 1 pixel
+      // Set height based on duration - scale to fit exactly in time slots
       const duration = task.duration || 30; // Default 30 minutes if no duration
-      const heightPixels = duration; // 1 minute = 1 pixel, so 60 minutes = 60 pixels (1 hour slot)
-      taskElement.style.height = `${Math.max(heightPixels, 20)}px`; // Minimum 20px height for visibility
-      taskElement.style.minHeight = '20px';
+      // Each hour slot is 69px total, with about 60px usable space for content
+      // Scale duration: 60 minutes = 60px usable space
+      const heightPixels = Math.max((duration / 60) * 60, 20); // Minimum 20px height for visibility
+      taskElement.style.height = `${heightPixels}px`;
+      taskElement.style.maxHeight = `${heightPixels}px`;
       
       const content = document.createElement('div');
       content.className = 'task-content';
@@ -1076,12 +1080,19 @@
           if (hour >= 6 && hour <= 23) {
             const taskElement = createTimelineTask(task);
             const slotIndex = hour - 6;
-            // Each time slot is 60px high + 1px border = 61px total per slot
-            // Position within that slot based on minutes (60px usable space per hour)
-            const minuteOffset = (minutes / 60) * 60; // Position within the hour slot (0-60px)
-            const totalTop = slotIndex * 61 + minuteOffset; // Account for 1px border per slot
+            
+            // Calculate position using actual time slot dimensions
+            // Each time slot is actually 69px tall (60px + padding/border)
+            const SLOT_HEIGHT = 69; // Actual rendered height per time slot
+            const hourTop = slotIndex * SLOT_HEIGHT;
+            // Add minute offset within the hour (proportional to available space)
+            const minuteOffset = (minutes / 60) * 60; // Scale minutes to available space in slot
+            const totalTop = hourTop + minuteOffset;
+            
             taskElement.style.top = `${totalTop}px`;
             taskElement.style.position = 'absolute';
+            taskElement.style.left = '8px';
+            taskElement.style.right = '8px';
             
             // Ensure proper stacking when multiple tasks are at same time
             taskElement.style.zIndex = '10';
