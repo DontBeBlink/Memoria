@@ -111,6 +111,82 @@
     .task-high-priority { border-left: 4px solid #dc2626; }
     .task-medium-priority { border-left: 4px solid #f59e0b; }
     .task-low-priority { border-left: 4px solid #059669; }
+    
+    /* Timeline and drag-drop styles */
+    .timeline-container { 
+      display: grid; 
+      grid-template-columns: 80px 1fr; 
+      gap: 8px; 
+      margin-top: 16px;
+    }
+    .timeline-hours {
+      display: flex;
+      flex-direction: column;
+    }
+    .timeline-content {
+      position: relative;
+      border-left: 2px solid #374151;
+    }
+    .time-slot {
+      height: 60px;
+      border-bottom: 1px solid #374151;
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      transition: background-color 0.2s;
+    }
+    .time-slot:hover {
+      background-color: #1f2937;
+    }
+    .time-slot.drag-over {
+      background-color: #2563eb !important;
+      border: 2px dashed #60a5fa;
+    }
+    .time-label {
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: right;
+      padding: 4px 8px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      border-bottom: 1px solid #374151;
+    }
+    .timeline-task {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      background: #0f172a;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 8px;
+      cursor: move;
+      z-index: 10;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .timeline-task:hover {
+      background: #1f2937;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .timeline-task.dragging {
+      opacity: 0.6;
+      transform: rotate(2deg);
+      z-index: 1000;
+    }
+    .timeline-task .task-content {
+      flex: 1;
+      font-size: 14px;
+    }
+    .timeline-task .task-time {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-left: 8px;
+    }
   </style>
 </head>
 <body>
@@ -175,6 +251,7 @@
             <button id="prevDay">&lt;</button>
             <button id="nextDay">&gt;</button>
             <button id="todayBtn">Today</button>
+            <button id="timelineToggle" style="background:#374151; color:#9ca3af;">📅 Timeline</button>
           </div>
         </div>
         <div id="dayContent"></div>
@@ -256,6 +333,7 @@
     const prevDayBtn = document.getElementById('prevDay');
     const nextDayBtn = document.getElementById('nextDay');
     const todayBtn = document.getElementById('todayBtn');
+    const timelineToggle = document.getElementById('timelineToggle');
     
     // Week navigation
     const prevWeekBtn = document.getElementById('prevWeek');
@@ -267,6 +345,7 @@
     let currentDate = new Date();
     let searchQuery = '';
     let showingUnscheduled = false;
+    let timelineMode = false;
     
     // Utility functions
     function formatDate(date) {
@@ -560,6 +639,82 @@
       return li;
     }
 
+    // Timeline drag and drop functions
+    function createTimelineTask(task) {
+      const taskElement = document.createElement('div');
+      taskElement.className = `timeline-task task-${task.priority || 'medium'}-priority`;
+      taskElement.draggable = true;
+      taskElement.dataset.taskId = task.id;
+      
+      const content = document.createElement('div');
+      content.className = 'task-content';
+      content.textContent = task.title;
+      
+      // Add priority badge
+      if (task.priority) {
+        const priorityBadge = document.createElement('span');
+        priorityBadge.className = `priority-badge priority-${task.priority}`;
+        const priorityText = {
+          'high': '🔴',
+          'medium': '🟡', 
+          'low': '🟢'
+        };
+        priorityBadge.textContent = priorityText[task.priority] || '🟡';
+        priorityBadge.style.marginLeft = '8px';
+        content.appendChild(priorityBadge);
+      }
+      
+      const timeElement = document.createElement('div');
+      timeElement.className = 'task-time';
+      timeElement.textContent = new Date(task.due).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      
+      taskElement.appendChild(content);
+      taskElement.appendChild(timeElement);
+      
+      // Add drag event listeners
+      taskElement.addEventListener('dragstart', handleDragStart);
+      taskElement.addEventListener('dragend', handleDragEnd);
+      
+      return taskElement;
+    }
+    
+    function handleDragStart(e) {
+      e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
+      e.target.classList.add('dragging');
+    }
+    
+    function handleDragEnd(e) {
+      e.target.classList.remove('dragging');
+    }
+    
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    }
+    
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+    
+    async function handleDrop(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      
+      const taskId = e.dataTransfer.getData('text/plain');
+      const targetHour = parseInt(e.currentTarget.dataset.hour);
+      
+      // Calculate new due date/time
+      const newDate = new Date(currentDate);
+      newDate.setHours(targetHour, 0, 0, 0);
+      
+      try {
+        await rescheduleTask(taskId, formatDateTime(newDate));
+      } catch (error) {
+        console.error('Failed to reschedule task:', error);
+        alert('Failed to reschedule task');
+      }
+    }
+
     // Day view functions
     async function renderDayView() {
       if (showingUnscheduled) {
@@ -576,6 +731,63 @@
         currentDate.toDateString();
       dayContent.innerHTML = '';
       
+      if (timelineMode) {
+        renderTimelineView(tasks);
+      } else {
+        renderListView(tasks);
+      }
+    }
+    
+    function renderTimelineView(tasks) {
+      // Create timeline container
+      const timelineContainer = document.createElement('div');
+      timelineContainer.className = 'timeline-container';
+      
+      const hoursColumn = document.createElement('div');
+      hoursColumn.className = 'timeline-hours';
+      
+      const contentColumn = document.createElement('div');
+      contentColumn.className = 'timeline-content';
+      
+      // Generate time slots (6 AM to 11 PM)
+      for (let hour = 6; hour <= 23; hour++) {
+        const timeLabel = document.createElement('div');
+        timeLabel.className = 'time-label';
+        timeLabel.textContent = `${hour % 12 === 0 ? 12 : hour % 12}${hour < 12 ? 'AM' : 'PM'}`;
+        hoursColumn.appendChild(timeLabel);
+        
+        const timeSlot = document.createElement('div');
+        timeSlot.className = 'time-slot';
+        timeSlot.dataset.hour = hour;
+        timeSlot.addEventListener('dragover', handleDragOver);
+        timeSlot.addEventListener('drop', handleDrop);
+        timeSlot.addEventListener('dragleave', handleDragLeave);
+        contentColumn.appendChild(timeSlot);
+      }
+      
+      // Position tasks in timeline
+      for (const task of tasks) {
+        if (task.due) {
+          const taskDate = new Date(task.due);
+          const hour = taskDate.getHours();
+          const minutes = taskDate.getMinutes();
+          
+          if (hour >= 6 && hour <= 23) {
+            const taskElement = createTimelineTask(task);
+            const slotIndex = hour - 6;
+            const topOffset = (minutes / 60) * 60; // Position within the hour slot
+            taskElement.style.top = `${slotIndex * 60 + topOffset}px`;
+            contentColumn.appendChild(taskElement);
+          }
+        }
+      }
+      
+      timelineContainer.appendChild(hoursColumn);
+      timelineContainer.appendChild(contentColumn);
+      dayContent.appendChild(timelineContainer);
+    }
+    
+    function renderListView(tasks) {
       // Group tasks by hour
       const hourGroups = {};
       const noTimeGroup = [];
@@ -786,6 +998,13 @@
 
     todayBtn.onclick = () => {
       currentDate = new Date();
+      renderDayView();
+    };
+    
+    timelineToggle.onclick = () => {
+      timelineMode = !timelineMode;
+      timelineToggle.textContent = timelineMode ? '📋 List' : '📅 Timeline';
+      timelineToggle.classList.toggle('recurrence-active', timelineMode);
       renderDayView();
     };
 
