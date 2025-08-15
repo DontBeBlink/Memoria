@@ -10,11 +10,13 @@ class MemoryPatch(BaseModel):
 class TaskIn(BaseModel):
     title: str = Field(..., min_length=1)
     due: Optional[str] = None  # ISO datetime string
+    rrule: Optional[str] = None  # RFC 5545 RRULE string
 
 class TaskPatch(BaseModel):
     title: Optional[str] = Field(None, min_length=1)
     due: Optional[str] = None  # ISO datetime string
     done: Optional[bool] = None
+    rrule: Optional[str] = None  # RFC 5545 RRULE string
 
 class CaptureIn(BaseModel):
     text: str = Field(..., min_length=1)
@@ -33,6 +35,7 @@ class Task(BaseModel):
     created: str
     tags: List[str]
     notified_at: Optional[str] = None
+    rrule: Optional[str] = None
 
 class TranscriptionResponse(BaseModel):
     text: str

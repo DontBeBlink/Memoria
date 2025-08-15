@@ -2,6 +2,9 @@ import sqlite3
 from typing import List, Optional, Any, Dict
 import os
 from datetime import datetime, timezone
+from dateutil import rrule
+from dateutil.parser import parse as parse_date
+from dateutil.relativedelta import relativedelta
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "app.db")
 
@@ -72,14 +75,14 @@ def add_memory(text: str) -> Dict[str, Any]:
   conn.close()
   return dict(row)
 
-def add_task(title: str, due: Optional[str]) -> Dict[str, Any]:
+def add_task(title: str, due: Optional[str], rrule: Optional[str] = None) -> Dict[str, Any]:
   created = datetime.utcnow().isoformat()
   tags = _tags_from(title)
   due_norm = _normalize_due_to_utc(due)
   conn = _connect()
   cur = conn.cursor()
-  cur.execute("INSERT INTO tasks(title, due, done, created, tags) VALUES (?, ?, 0, ?, ?)",
-              (title, due_norm, created, tags))
+  cur.execute("INSERT INTO tasks(title, due, done, created, tags, rrule) VALUES (?, ?, 0, ?, ?, ?)",
+              (title, due_norm, created, tags, rrule))
   task_id = cur.lastrowid
   conn.commit()
   row = cur.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
@@ -147,6 +150,61 @@ def list_memories(limit: int = 100, offset: int = 0, query: Optional[str] = None
     "total": total
   }
 
+def _expand_recurring_task(task: Dict[str, Any], start_date: Optional[datetime], end_date: Optional[datetime]) -> List[Dict[str, Any]]:
+  """Expand a recurring task into multiple instances based on its RRULE."""
+  if not task.get('rrule') or not task.get('due'):
+    return [task]
+  
+  try:
+    # Parse the task's due date as the start of recurrence
+    due_dt = parse_date(task['due'])
+    
+    # Ensure due_dt is timezone aware
+    if due_dt.tzinfo is None:
+      due_dt = due_dt.replace(tzinfo=timezone.utc)
+    
+    # Parse the RRULE
+    rrule_obj = rrule.rrulestr(task['rrule'], dtstart=due_dt)
+    
+    # Set default date range if not provided
+    if not start_date:
+      start_date = datetime.now(timezone.utc)
+    elif start_date.tzinfo is None:
+      start_date = start_date.replace(tzinfo=timezone.utc)
+      
+    if not end_date:
+      # Default to 6 months from start
+      end_date = start_date + relativedelta(months=6)
+    elif end_date.tzinfo is None:
+      end_date = end_date.replace(tzinfo=timezone.utc)
+    
+    # Generate occurrences within the date range
+    occurrences = []
+    for occurrence in rrule_obj:
+      # Ensure occurrence is timezone aware
+      if occurrence.tzinfo is None:
+        occurrence = occurrence.replace(tzinfo=timezone.utc)
+        
+      if occurrence > end_date:
+        break
+      if occurrence >= start_date:
+        # Create a copy of the task with the new due date
+        task_copy = task.copy()
+        task_copy['due'] = occurrence.isoformat()
+        # Add a suffix to the ID to make each occurrence unique
+        task_copy['id'] = f"{task['id']}_r_{occurrence.strftime('%Y%m%d_%H%M%S')}"
+        task_copy['is_recurring_instance'] = True
+        task_copy['parent_task_id'] = task['id']
+        occurrences.append(task_copy)
+    
+    return occurrences if occurrences else []
+    
+  except Exception as e:
+    # If there's an error parsing the RRULE, return the original task
+    print(f"Error expanding recurring task {task['id']}: {e}")
+    return [task]
+
+
 def list_tasks(open_only: bool = False, limit: int = 200, start: Optional[str] = None, end: Optional[str] = None):
   conn = _connect()
   
@@ -157,14 +215,8 @@ def list_tasks(open_only: bool = False, limit: int = 200, start: Optional[str] =
   if open_only:
     conditions.append("done=0")
   
-  if start:
-    conditions.append("due >= ?")
-    params.append(start)
-    
-  if end:
-    conditions.append("due <= ?")
-    params.append(end)
-  
+  # For recurring tasks, we don't apply date filtering at the SQL level
+  # We'll handle it after expanding recurring tasks
   where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
   order_clause = " ORDER BY COALESCE(due, '9999') ASC, id DESC" if open_only else " ORDER BY id DESC"
   
@@ -173,7 +225,68 @@ def list_tasks(open_only: bool = False, limit: int = 200, start: Optional[str] =
   
   rows = conn.execute(query, params).fetchall()
   conn.close()
-  return [dict(r) for r in rows]
+  
+  # Convert to list of dicts
+  tasks = [dict(r) for r in rows]
+  
+  # Parse date range for recurring task expansion
+  start_date = None
+  end_date = None
+  if start:
+    try:
+      start_date = parse_date(start)
+      if start_date.tzinfo is None:
+        start_date = start_date.replace(tzinfo=timezone.utc)
+    except:
+      pass
+  if end:
+    try:
+      end_date = parse_date(end)
+      if end_date.tzinfo is None:
+        end_date = end_date.replace(tzinfo=timezone.utc)
+    except:
+      pass
+  
+  # Expand recurring tasks and apply date filtering
+  expanded_tasks = []
+  for task in tasks:
+    if task.get('rrule'):
+      # Expand recurring task
+      instances = _expand_recurring_task(task, start_date, end_date)
+      for instance in instances:
+        # Apply date range filtering to instances
+        if start_date or end_date:
+          instance_due = parse_date(instance['due']) if instance.get('due') else None
+          if instance_due:
+            # Ensure timezone awareness
+            if instance_due.tzinfo is None:
+              instance_due = instance_due.replace(tzinfo=timezone.utc)
+            if start_date and instance_due < start_date:
+              continue
+            if end_date and instance_due > end_date:
+              continue
+        expanded_tasks.append(instance)
+    else:
+      # Non-recurring task - apply original date filtering
+      if start or end:
+        task_due = parse_date(task['due']) if task.get('due') else None
+        if task_due:
+          # Ensure timezone awareness
+          if task_due.tzinfo is None:
+            task_due = task_due.replace(tzinfo=timezone.utc)
+          if start_date and task_due < start_date:
+            continue
+          if end_date and task_due > end_date:
+            continue
+      expanded_tasks.append(task)
+  
+  # Sort again after expansion
+  if open_only:
+    expanded_tasks.sort(key=lambda x: (x.get('due') or '9999', -int(str(x['id']).split('_')[0])))
+  else:
+    expanded_tasks.sort(key=lambda x: -int(str(x['id']).split('_')[0]))
+  
+  return expanded_tasks[:limit]
 
 def mark_done(task_id: int, done: bool):
   conn = _connect()
@@ -253,11 +366,12 @@ def import_task(task_data: Dict[str, Any], overwrite: bool = False) -> Dict[str,
       # Update existing task
       due_norm = _normalize_due_to_utc(task_data.get('due'))
       cur.execute("""UPDATE tasks 
-                     SET title=?, due=?, done=?, created=?, tags=?, notified_at=?
+                     SET title=?, due=?, done=?, created=?, tags=?, notified_at=?, rrule=?
                      WHERE id=?""", 
                   (task_data['title'], due_norm, 
                    task_data.get('done', 0), task_data['created'],
                    task_data.get('tags', ''), task_data.get('notified_at'),
+                   task_data.get('rrule'),
                    task_data['id']))
       conn.commit()
       conn.close()
@@ -265,11 +379,12 @@ def import_task(task_data: Dict[str, Any], overwrite: bool = False) -> Dict[str,
     else:
       # Insert new task with specific ID
       due_norm = _normalize_due_to_utc(task_data.get('due'))
-      cur.execute("""INSERT INTO tasks(id, title, due, done, created, tags, notified_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)""",
+      cur.execute("""INSERT INTO tasks(id, title, due, done, created, tags, notified_at, rrule) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                   (task_data['id'], task_data['title'], due_norm,
                    task_data.get('done', 0), task_data['created'],
-                   task_data.get('tags', ''), task_data.get('notified_at')))
+                   task_data.get('tags', ''), task_data.get('notified_at'),
+                   task_data.get('rrule')))
       conn.commit()
       conn.close()
       return {"status": "inserted"}
@@ -367,6 +482,9 @@ def update_task(task_id: int, **fields) -> Optional[Dict[str, Any]]:
     elif field == "done":
       set_clauses.append("done = ?")
       values.append(1 if value else 0)
+    elif field == "rrule":
+      set_clauses.append("rrule = ?")
+      values.append(value)
   
   if not set_clauses:
     conn.close()

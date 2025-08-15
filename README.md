@@ -103,6 +103,50 @@ Each memory and task has a trash icon (🗑️) button for deletion:
 - API returns 404 for unknown IDs; UI shows "Item already gone" message
 - Works with keyboard navigation (Tab to focus, Enter/Space to activate)
 
+## Recurring Tasks and Calendar Integration
+
+Memoria supports recurring tasks with RRULE (RFC 5545) and iCalendar export:
+
+### Creating Recurring Tasks
+1. **Add a task** with a due date (e.g., "Daily standup tomorrow 9am")
+2. **Click the 🔁 Repeat button** to show recurrence options
+3. **Select repeat pattern**:
+   - Daily, Weekly, Monthly
+   - Custom RRULE for advanced patterns
+4. **Add the task** - it will show 🔁 Recurring badge
+
+### Viewing Recurring Tasks
+- **Original task**: Shows 🔁 Recurring badge
+- **Recurring instances**: Show ↻ Instance badge with green color
+- **Agenda views**: Display all instances within the date range
+- **Task management**: Each instance can be marked done independently
+
+### iCalendar Export
+Export your tasks to Google Calendar, Apple Calendar, or other calendar apps:
+
+```bash
+# Get your calendar feed (requires AUTH_TOKEN)
+GET /calendar.ics
+# With authentication header: X-Auth-Token: your_token
+
+# Optional filters:
+GET /calendar.ics?q=meeting          # Filter by keyword
+GET /calendar.ics?priority=high      # Filter by priority
+```
+
+**Calendar Features:**
+- **VEVENT entries** for all scheduled tasks
+- **RRULE support** for recurring tasks
+- **UTC timestamps** for proper timezone handling
+- **Unique UIDs** for each task instance
+- **Status tracking** (NEEDS-ACTION/COMPLETED)
+
+**Usage in Calendar Apps:**
+1. Copy the calendar URL: `https://your-server/calendar.ics`
+2. Add authentication: `?token=your_auth_token` (if using URL-based auth)
+3. Import or subscribe in your calendar app
+4. Tasks appear as calendar events with recurrence
+
 ### Bulk Operations for Memories
 
 The enhanced Memories page supports bulk operations:

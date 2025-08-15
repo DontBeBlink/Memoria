@@ -87,6 +87,16 @@
       display:inline-block; background:#f59e0b; color:white; 
       padding:2px 6px; border-radius:3px; font-size:11px; margin-left:8px;
     }
+    
+    /* Recurring task badge */
+    .recurring-badge {
+      display:inline-block; background:#8b5cf6; color:white;
+      padding:2px 6px; border-radius:3px; font-size:10px; margin-left:8px;
+      font-weight:500;
+    }
+    
+    /* Recurrence form styles */
+    .recurrence-active { background:#374151 !important; color:#e5e7eb !important; }
   </style>
 </head>
 <body>
@@ -97,8 +107,29 @@
       <!-- Add Task Form -->
       <section style="margin-bottom:20px;">
         <form id="taskForm">
-          <input id="taskText" type="text" placeholder="Add a task... (try 'Meeting Mon 9a' or 'Call client in 2h')" required />
-          <button type="submit">Add</button>
+          <div class="row">
+            <input id="taskText" type="text" placeholder="Add a task... (try 'Meeting Mon 9a' or 'Call client in 2h')" required style="flex:1;" />
+            <button type="button" id="repeatToggle" style="background:#374151; color:#9ca3af;">🔁 Repeat</button>
+            <button type="submit">Add</button>
+          </div>
+          
+          <!-- Recurrence Options (initially hidden) -->
+          <div id="recurrenceOptions" style="display:none; margin-top:8px; padding:12px; border:1px solid #374151; border-radius:8px; background:#1f2937;">
+            <div class="row" style="margin-bottom:8px;">
+              <label style="color:#9ca3af; font-size:14px;">Repeat:</label>
+              <select id="recurrenceType" style="padding:4px 8px; border-radius:4px; background:#0f172a; color:#e5e7eb; border:1px solid #374151;">
+                <option value="">No repeat</option>
+                <option value="FREQ=DAILY">Daily</option>
+                <option value="FREQ=WEEKLY">Weekly</option>
+                <option value="FREQ=MONTHLY">Monthly</option>
+                <option value="custom">Custom RRULE</option>
+              </select>
+            </div>
+            <input id="customRrule" type="text" placeholder="Custom RRULE (e.g., FREQ=WEEKLY;BYDAY=MO,WE,FR)" style="display:none; width:100%; padding:6px 8px; border-radius:4px; background:#0f172a; color:#e5e7eb; border:1px solid #374151; font-size:12px;" />
+            <div class="row" style="margin-top:8px; font-size:12px; color:#6b7280;">
+              <span>💡 Tip: Set a due date first, then configure repeat pattern</span>
+            </div>
+          </div>
         </form>
       </section>
 
@@ -179,6 +210,10 @@
     // Initialize page elements
     const taskForm = document.getElementById('taskForm');
     const taskText = document.getElementById('taskText');
+    const repeatToggle = document.getElementById('repeatToggle');
+    const recurrenceOptions = document.getElementById('recurrenceOptions');
+    const recurrenceType = document.getElementById('recurrenceType');
+    const customRrule = document.getElementById('customRrule');
     const searchInput = document.getElementById('searchInput');
     const clearSearchBtn = document.getElementById('clearSearch');
     const viewUnscheduledBtn = document.getElementById('viewUnscheduled');
@@ -364,6 +399,25 @@
       const title = document.createElement('div');
       title.textContent = task.title;
       title.className = 'content-text';
+      
+      // Add recurring badge if task has rrule
+      if (task.rrule) {
+        const badge = document.createElement('span');
+        badge.className = 'recurring-badge';
+        badge.textContent = '🔁 Recurring';
+        badge.title = `RRULE: ${task.rrule}`;
+        title.appendChild(badge);
+      }
+      
+      // Add instance indicator for recurring task instances
+      if (task.is_recurring_instance) {
+        const instanceBadge = document.createElement('span');
+        instanceBadge.className = 'recurring-badge';
+        instanceBadge.style.background = '#059669';
+        instanceBadge.textContent = '↻ Instance';
+        instanceBadge.title = `Instance of recurring task #${task.parent_task_id}`;
+        title.appendChild(instanceBadge);
+      }
       
       const meta = document.createElement('div');
       meta.className = 'tags';
@@ -660,14 +714,47 @@
       refreshCurrentView();
     };
 
+    // Recurrence toggle functionality
+    repeatToggle.onclick = () => {
+      const isVisible = recurrenceOptions.style.display !== 'none';
+      recurrenceOptions.style.display = isVisible ? 'none' : 'block';
+      repeatToggle.classList.toggle('recurrence-active', !isVisible);
+    };
+
+    // Recurrence type change handler
+    recurrenceType.onchange = () => {
+      const isCustom = recurrenceType.value === 'custom';
+      customRrule.style.display = isCustom ? 'block' : 'none';
+      if (!isCustom) {
+        customRrule.value = '';
+      }
+    };
+
     taskForm.onsubmit = async (e) => {
       e.preventDefault();
       const title = taskText.value.trim();
       if (!title) return;
       
+      // Get recurrence rule
+      let rrule = null;
+      if (recurrenceType.value === 'custom') {
+        rrule = customRrule.value.trim() || null;
+      } else if (recurrenceType.value) {
+        rrule = recurrenceType.value;
+      }
+      
       try {
-        await window.memoriaAPI.request('/tasks', 'POST', { title });
+        const taskData = { title };
+        if (rrule) {
+          taskData.rrule = rrule;
+        }
+        
+        await window.memoriaAPI.request('/tasks', 'POST', taskData);
         taskText.value = '';
+        recurrenceType.value = '';
+        customRrule.value = '';
+        recurrenceOptions.style.display = 'none';
+        repeatToggle.classList.remove('recurrence-active');
         await refreshCurrentView();
       } catch (error) {
         console.error('Failed to add task:', error);

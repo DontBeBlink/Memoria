@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, Tuple
 
 from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import requests
@@ -151,9 +151,9 @@ def post_task(task: TaskIn, auth=Depends(require_auth)):
     if extracted_due:
       due = extracted_due
       # Use cleaned title without date information
-      return storage.add_task(cleaned_title, due)
+      return storage.add_task(cleaned_title, due, task.rrule)
   
-  return storage.add_task(task.title, due)
+  return storage.add_task(task.title, due, task.rrule)
 
 @app.patch("/tasks/{task_id}")
 def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
@@ -165,6 +165,8 @@ def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
     fields["due"] = task.due
   if task.done is not None:
     fields["done"] = task.done
+  if task.rrule is not None:
+    fields["rrule"] = task.rrule
   
   if not fields:
     raise HTTPException(status_code=400, detail="No fields to update")
@@ -198,6 +200,101 @@ def capture(data: CaptureIn, auth=Depends(require_auth)):
   else:
     row = storage.add_memory(parsed["text"])
     return {"type": "memory", "item": row}
+
+@app.get("/calendar.ics")
+def get_calendar_ics(token: Optional[str] = None, q: Optional[str] = None, priority: Optional[str] = None, auth=Depends(require_auth)):
+  """Export tasks as iCalendar (.ics) format for calendar applications."""
+  try:
+    from icalendar import Calendar, Event
+    from datetime import datetime
+    import uuid
+    
+    # Create calendar
+    cal = Calendar()
+    cal.add('prodid', '-//Memoria Hub//Tasks Calendar//EN')
+    cal.add('version', '2.0')
+    cal.add('calscale', 'GREGORIAN')
+    cal.add('method', 'PUBLISH')
+    cal.add('x-wr-calname', 'Memoria Tasks')
+    cal.add('x-wr-caldesc', 'Tasks from Memoria Hub')
+    
+    # Get tasks with a reasonable time range (next 6 months)
+    from dateutil.relativedelta import relativedelta
+    start_date = datetime.utcnow()
+    end_date = start_date + relativedelta(months=6)
+    
+    tasks = storage.list_tasks(
+      open_only=True,
+      start=start_date.isoformat(),
+      end=end_date.isoformat()
+    )
+    
+    # Apply filters if provided
+    if q:
+      tasks = [t for t in tasks if q.lower() in t['title'].lower()]
+    
+    if priority:
+      # Simple priority filtering based on tags or keywords
+      priority_keywords = {
+        'high': ['urgent', 'important', '!', 'asap'],
+        'medium': ['medium', 'normal'],
+        'low': ['low', 'later', 'someday']
+      }
+      if priority in priority_keywords:
+        keywords = priority_keywords[priority]
+        tasks = [t for t in tasks if any(kw in t['title'].lower() or kw in t.get('tags', '') for kw in keywords)]
+    
+    # Create events for each task
+    for task in tasks:
+      if not task.get('due'):
+        continue
+        
+      event = Event()
+      event.add('uid', f"memoria-task-{task['id']}@memoria-hub")
+      event.add('summary', task['title'])
+      event.add('description', f"Task from Memoria Hub\nTags: {task.get('tags', '')}")
+      
+      # Parse due date
+      try:
+        due_dt = datetime.fromisoformat(task['due'].replace('Z', '+00:00'))
+        event.add('dtstart', due_dt)
+        event.add('dtend', due_dt)  # All-day or point-in-time event
+      except:
+        continue
+      
+      # Add recurrence rule if present
+      if task.get('rrule'):
+        try:
+          event.add('rrule', task['rrule'])
+        except:
+          pass  # Invalid RRULE, skip
+      
+      # Set status based on completion
+      if task.get('done'):
+        event.add('status', 'COMPLETED')
+      else:
+        event.add('status', 'NEEDS-ACTION')
+      
+      event.add('created', datetime.fromisoformat(task['created'].replace('Z', '+00:00')))
+      event.add('dtstamp', datetime.utcnow())
+      
+      cal.add_component(event)
+    
+    # Return as ICS file
+    ics_content = cal.to_ical().decode('utf-8')
+    
+    return Response(
+      content=ics_content,
+      media_type="text/calendar",
+      headers={
+        "Content-Disposition": "attachment; filename=memoria-tasks.ics"
+      }
+    )
+    
+  except ImportError:
+    raise HTTPException(status_code=500, detail="iCalendar support not available. Install with: pip install icalendar")
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=f"Error generating calendar: {str(e)}")
 
 @app.get("/export")
 def export_data(auth=Depends(require_auth)):
