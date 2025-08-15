@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, Tuple
 
 from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import requests
@@ -151,12 +151,25 @@ def post_task(task: TaskIn, auth=Depends(require_auth)):
     if extracted_due:
       due = extracted_due
       # Use cleaned title without date information
-      return storage.add_task(cleaned_title, due)
+      return storage.add_task(cleaned_title, due, task.rrule, task.priority, task.duration)
   
-  return storage.add_task(task.title, due)
+  return storage.add_task(task.title, due, task.rrule, task.priority, task.duration)
 
 @app.patch("/tasks/{task_id}")
-def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
+def patch_task(task_id: str, task: TaskPatch, auth=Depends(require_auth)):
+  # Handle both regular task IDs (integers) and recurring instance IDs (strings)
+  try:
+    # Try to parse as integer for regular tasks
+    task_id_int = int(task_id)
+  except ValueError:
+    # Handle recurring instance IDs (format: {parent_id}_r_{datetime})
+    if '_r_' in task_id:
+      # For now, recurring instances can't be updated individually
+      # In a real implementation, you might store instance-specific overrides
+      raise HTTPException(status_code=400, detail="Editing individual recurring instances is not yet supported. Edit the parent recurring task instead.")
+    else:
+      raise HTTPException(status_code=400, detail="Invalid task ID format")
+  
   # Prepare fields to update
   fields = {}
   if task.title is not None:
@@ -165,26 +178,67 @@ def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
     fields["due"] = task.due
   if task.done is not None:
     fields["done"] = task.done
+  if task.rrule is not None:
+    fields["rrule"] = task.rrule
+  if task.priority is not None:
+    fields["priority"] = task.priority
+  if task.duration is not None:
+    fields["duration"] = task.duration
   
   if not fields:
     raise HTTPException(status_code=400, detail="No fields to update")
   
-  result = storage.update_task(task_id, **fields)
+  result = storage.update_task(task_id_int, **fields)
   if not result:
     raise HTTPException(status_code=404, detail="Task not found")
   
   return result
 
 @app.delete("/tasks/{task_id}", status_code=204)
-def delete_task(task_id: int, auth=Depends(require_auth)):
-  deleted = storage.delete_task(task_id)
-  if not deleted:
-    raise HTTPException(status_code=404, detail="Not found")
-  return None
+def delete_task(task_id: str, auth=Depends(require_auth)):
+  # Handle both regular task IDs (integers) and recurring instance IDs (strings)
+  try:
+    # Try to parse as integer for regular tasks
+    task_id_int = int(task_id)
+    deleted = storage.delete_task(task_id_int)
+    if not deleted:
+      raise HTTPException(status_code=404, detail="Not found")
+    return None
+  except ValueError:
+    # Handle recurring instance IDs (format: {parent_id}_r_{datetime})
+    if '_r_' in task_id:
+      # For recurring instances, extract the parent task ID and delete the parent task
+      # This will delete the entire recurring series
+      try:
+        parent_id_str = task_id.split('_r_')[0]
+        parent_id = int(parent_id_str)
+        deleted = storage.delete_task(parent_id)
+        if not deleted:
+          raise HTTPException(status_code=404, detail="Parent recurring task not found")
+        return None
+      except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid recurring task ID format")
+    else:
+      raise HTTPException(status_code=400, detail="Invalid task ID format")
 
 @app.post("/tasks/{task_id}/done")
-def done_task(task_id: int, done: bool = True, auth=Depends(require_auth)):
-  row = storage.mark_done(task_id, done)
+def done_task(task_id: str, done: bool = True, auth=Depends(require_auth)):
+  # Handle both regular task IDs (integers) and recurring instance IDs (strings)
+  try:
+    # Try to parse as integer for regular tasks
+    task_id_int = int(task_id)
+    row = storage.mark_done(task_id_int, done)
+  except ValueError:
+    # Handle recurring instance IDs (format: {parent_id}_r_{datetime})
+    if '_r_' in task_id:
+      # For recurring instances, we can't mark them done in the database
+      # since they're generated dynamically. In a real implementation,
+      # you might store completed instances in a separate table.
+      # For now, return a success response but don't persist the change.
+      return {"message": "Recurring instance marked as done (not persisted)"}
+    else:
+      raise HTTPException(status_code=400, detail="Invalid task ID format")
+  
   if not row:
     raise HTTPException(status_code=404, detail="Not found")
   return row
@@ -198,6 +252,101 @@ def capture(data: CaptureIn, auth=Depends(require_auth)):
   else:
     row = storage.add_memory(parsed["text"])
     return {"type": "memory", "item": row}
+
+@app.get("/calendar.ics")
+def get_calendar_ics(token: Optional[str] = None, q: Optional[str] = None, priority: Optional[str] = None, auth=Depends(require_auth)):
+  """Export tasks as iCalendar (.ics) format for calendar applications."""
+  try:
+    from icalendar import Calendar, Event
+    from datetime import datetime
+    import uuid
+    
+    # Create calendar
+    cal = Calendar()
+    cal.add('prodid', '-//Memoria Hub//Tasks Calendar//EN')
+    cal.add('version', '2.0')
+    cal.add('calscale', 'GREGORIAN')
+    cal.add('method', 'PUBLISH')
+    cal.add('x-wr-calname', 'Memoria Tasks')
+    cal.add('x-wr-caldesc', 'Tasks from Memoria Hub')
+    
+    # Get tasks with a reasonable time range (next 6 months)
+    from dateutil.relativedelta import relativedelta
+    start_date = datetime.utcnow()
+    end_date = start_date + relativedelta(months=6)
+    
+    tasks = storage.list_tasks(
+      open_only=True,
+      start=start_date.isoformat(),
+      end=end_date.isoformat()
+    )
+    
+    # Apply filters if provided
+    if q:
+      tasks = [t for t in tasks if q.lower() in t['title'].lower()]
+    
+    if priority:
+      # Simple priority filtering based on tags or keywords
+      priority_keywords = {
+        'high': ['urgent', 'important', '!', 'asap'],
+        'medium': ['medium', 'normal'],
+        'low': ['low', 'later', 'someday']
+      }
+      if priority in priority_keywords:
+        keywords = priority_keywords[priority]
+        tasks = [t for t in tasks if any(kw in t['title'].lower() or kw in t.get('tags', '') for kw in keywords)]
+    
+    # Create events for each task
+    for task in tasks:
+      if not task.get('due'):
+        continue
+        
+      event = Event()
+      event.add('uid', f"memoria-task-{task['id']}@memoria-hub")
+      event.add('summary', task['title'])
+      event.add('description', f"Task from Memoria Hub\nTags: {task.get('tags', '')}")
+      
+      # Parse due date
+      try:
+        due_dt = datetime.fromisoformat(task['due'].replace('Z', '+00:00'))
+        event.add('dtstart', due_dt)
+        event.add('dtend', due_dt)  # All-day or point-in-time event
+      except:
+        continue
+      
+      # Add recurrence rule if present
+      if task.get('rrule'):
+        try:
+          event.add('rrule', task['rrule'])
+        except:
+          pass  # Invalid RRULE, skip
+      
+      # Set status based on completion
+      if task.get('done'):
+        event.add('status', 'COMPLETED')
+      else:
+        event.add('status', 'NEEDS-ACTION')
+      
+      event.add('created', datetime.fromisoformat(task['created'].replace('Z', '+00:00')))
+      event.add('dtstamp', datetime.utcnow())
+      
+      cal.add_component(event)
+    
+    # Return as ICS file
+    ics_content = cal.to_ical().decode('utf-8')
+    
+    return Response(
+      content=ics_content,
+      media_type="text/calendar",
+      headers={
+        "Content-Disposition": "attachment; filename=memoria-tasks.ics"
+      }
+    )
+    
+  except ImportError:
+    raise HTTPException(status_code=500, detail="iCalendar support not available. Install with: pip install icalendar")
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=f"Error generating calendar: {str(e)}")
 
 @app.get("/export")
 def export_data(auth=Depends(require_auth)):

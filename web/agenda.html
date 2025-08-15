@@ -87,6 +87,288 @@
       display:inline-block; background:#f59e0b; color:white; 
       padding:2px 6px; border-radius:3px; font-size:11px; margin-left:8px;
     }
+    
+    /* Recurring task badge */
+    .recurring-badge {
+      display:inline-block; background:#8b5cf6; color:white;
+      padding:2px 6px; border-radius:3px; font-size:10px; margin-left:8px;
+      font-weight:500;
+    }
+    
+    /* Recurrence form styles */
+    .recurrence-active { background:#374151 !important; color:#e5e7eb !important; }
+    
+    /* Priority indicators */
+    .priority-badge {
+      display:inline-block; padding:2px 6px; border-radius:3px; 
+      font-size:10px; margin-left:8px; font-weight:500;
+    }
+    .priority-high { background:#dc2626; color:white; }
+    .priority-medium { background:#f59e0b; color:white; }
+    .priority-low { background:#059669; color:white; }
+    
+    /* Priority-based task styling */
+    .task-high-priority { border-left: 4px solid #dc2626; }
+    .task-medium-priority { border-left: 4px solid #f59e0b; }
+    .task-low-priority { border-left: 4px solid #059669; }
+    
+    /* Timeline and drag-drop styles */
+    .timeline-container { 
+      display: grid; 
+      grid-template-columns: 80px 1fr; 
+      gap: 8px; 
+      margin-top: 16px;
+    }
+    .timeline-hours {
+      display: flex;
+      flex-direction: column;
+    }
+    .timeline-content {
+      position: relative;
+      border-left: 2px solid #374151;
+      min-height: calc(18 * 61px); /* Dynamic calculation based on hour slots */
+    }
+    .time-slot, .hour-line {
+      height: 60px;
+      border-bottom: 1px solid #374151;
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      transition: background-color 0.2s;
+    }
+    .time-slot[data-hour], .hour-line[data-hour] {
+      /* Add data-hour attribute for DOM measurement */
+    }
+    .time-slot:hover {
+      background-color: #1f2937;
+    }
+    .time-slot.drag-over {
+      background-color: #2563eb !important;
+      border: 2px dashed #60a5fa;
+    }
+    .time-label, .hour-line {
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: right;
+      padding: 4px 8px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      border-bottom: 1px solid #374151;
+    }
+    .time-label[data-hour], .hour-line[data-hour] {
+      /* Add data-hour attribute for DOM measurement */
+    }
+    .timeline-task, .task-block {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      background: #0f172a;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: move;
+      z-index: 10;
+      min-height: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      transition: all 0.2s;
+      box-sizing: border-box;
+    }
+    .timeline-task:hover {
+      background: #1f2937;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .timeline-task.dragging {
+      opacity: 0.6;
+      transform: rotate(2deg);
+      z-index: 1000;
+    }
+    .timeline-task .task-content {
+      flex: 1;
+      font-size: 14px;
+    }
+    .timeline-task .task-time {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-left: 8px;
+    }
+    .timeline-task.has-duration {
+      border: 2px solid;
+      border-color: inherit;
+    }
+    .timeline-task.conflict {
+      border-color: #ef4444;
+      background: #1f1a1a;
+      border-style: dashed;
+    }
+    .duration-indicator {
+      background: rgba(0,0,0,0.3);
+      color: #9ca3af;
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 2px;
+      margin-left: 8px;
+      display: inline-block;
+    }
+    
+    /* Monthly calendar styles */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: #374151;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .calendar-header {
+      background: #1f2937;
+      padding: 8px 4px;
+      text-align: center;
+      font-weight: 500;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .calendar-day {
+      background: #0f172a;
+      min-height: 100px;
+      padding: 4px;
+      position: relative;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .calendar-day:hover {
+      background: #1f2937;
+    }
+    .calendar-day.today {
+      background: #1e3a8a;
+      border: 2px solid #3b82f6;
+    }
+    .calendar-day.other-month {
+      background: #111827;
+      color: #6b7280;
+    }
+    .calendar-day.other-month:hover {
+      background: #1f2937;
+    }
+    .day-number {
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .day-tasks {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .calendar-task {
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 2px;
+      background: #374151;
+      color: #e5e7eb;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+    .calendar-task.high { background: #dc2626; }
+    .calendar-task.medium { background: #f59e0b; }
+    .calendar-task.low { background: #059669; }
+    .calendar-task-more {
+      font-size: 9px;
+      color: #9ca3af;
+      text-align: center;
+      padding: 1px;
+    }
+    
+    /* Template buttons */
+    .template-btn {
+      padding: 6px 12px;
+      margin: 0 4px 4px 0;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      background: #1f2937;
+      color: #e5e7eb;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+    .template-btn:hover {
+      background: #374151;
+      border-color: #4b5563;
+    }
+    .template-btn:active {
+      background: #2563eb;
+      border-color: #3b82f6;
+    }
+    
+    /* Debug overlay styles */
+    .debug-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 100;
+      background: rgba(255, 0, 0, 0.05);
+    }
+    .debug-guide {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(255, 255, 0, 0.8);
+      z-index: 101;
+    }
+    .debug-guide::before {
+      content: attr(data-time);
+      position: absolute;
+      left: 4px;
+      top: -10px;
+      font-size: 10px;
+      color: #ffff00;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-family: monospace;
+    }
+    .debug-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #ffffff;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+      z-index: 1000;
+      min-width: 200px;
+    }
+    .debug-panel h4 {
+      margin: 0 0 8px 0;
+      color: #ffff00;
+      font-size: 12px;
+    }
+    .debug-panel .metric {
+      margin: 2px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+    .debug-panel .metric-label {
+      color: #cccccc;
+    }
+    .debug-panel .metric-value {
+      color: #00ff00;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -94,11 +376,51 @@
   <div id="authWarningContainer"></div>
   <main>
     <div class="agenda-container">
+      <!-- Quick Templates -->
+      <section style="margin-bottom:16px;">
+        <div style="margin-bottom:8px;">
+          <span style="color:#9ca3af; font-size:14px; margin-right:12px;">🚀 Quick Templates:</span>
+          <button type="button" class="template-btn" data-template="memoria">💻 Work on Memoria</button>
+          <button type="button" class="template-btn" data-template="project">🚀 Personal Project</button>
+          <button type="button" class="template-btn" data-template="research">🔍 Research Topic</button>
+          <button type="button" class="template-btn" data-template="girlfriend">💕 Message Girlfriend</button>
+          <button type="button" class="template-btn" data-template="break">☕ Take a Break</button>
+          <button type="button" class="template-btn" data-template="planning">📝 Plan Day/Week</button>
+        </div>
+      </section>
+      
       <!-- Add Task Form -->
       <section style="margin-bottom:20px;">
         <form id="taskForm">
-          <input id="taskText" type="text" placeholder="Add a task... (try 'Meeting Mon 9a' or 'Call client in 2h')" required />
-          <button type="submit">Add</button>
+          <div class="row">
+            <input id="taskText" type="text" placeholder="Add a task... (try 'Meeting Mon 9a' or 'Call client in 2h')" required style="flex:1;" />
+            <input id="durationInput" type="text" placeholder="Duration (e.g. 1h, 30m)" style="padding:10px 12px; border-radius:8px; background:#0f172a; color:#e5e7eb; border:1px solid #374151; min-width:120px;" />
+            <select id="prioritySelect" style="padding:10px 12px; border-radius:8px; background:#0f172a; color:#e5e7eb; border:1px solid #374151; min-width:100px;">
+              <option value="low">🟢 Low</option>
+              <option value="medium" selected>🟡 Medium</option>
+              <option value="high">🔴 High</option>
+            </select>
+            <button type="button" id="repeatToggle" style="background:#374151; color:#9ca3af;">🔁 Repeat</button>
+            <button type="submit">Add</button>
+          </div>
+          
+          <!-- Recurrence Options (initially hidden) -->
+          <div id="recurrenceOptions" style="display:none; margin-top:8px; padding:12px; border:1px solid #374151; border-radius:8px; background:#1f2937;">
+            <div class="row" style="margin-bottom:8px;">
+              <label style="color:#9ca3af; font-size:14px;">Repeat:</label>
+              <select id="recurrenceType" style="padding:4px 8px; border-radius:4px; background:#0f172a; color:#e5e7eb; border:1px solid #374151;">
+                <option value="">No repeat</option>
+                <option value="FREQ=DAILY">Daily</option>
+                <option value="FREQ=WEEKLY">Weekly</option>
+                <option value="FREQ=MONTHLY">Monthly</option>
+                <option value="custom">Custom RRULE</option>
+              </select>
+            </div>
+            <input id="customRrule" type="text" placeholder="Custom RRULE (e.g., FREQ=WEEKLY;BYDAY=MO,WE,FR)" style="display:none; width:100%; padding:6px 8px; border-radius:4px; background:#0f172a; color:#e5e7eb; border:1px solid #374151; font-size:12px;" />
+            <div class="row" style="margin-top:8px; font-size:12px; color:#6b7280;">
+              <span>💡 Tip: Set a due date first, then configure repeat pattern</span>
+            </div>
+          </div>
         </form>
       </section>
 
@@ -111,10 +433,19 @@
         </div>
       </section>
 
+      <!-- Clock and Timezone Display -->
+      <section style="margin-bottom:20px; text-align:center;">
+        <div id="clockDisplay" style="background:#1f2937; border-radius:8px; padding:12px; display:inline-block; border:1px solid #374151;">
+          <div id="currentTime" style="font-size:18px; font-weight:500; color:#60a5fa; margin-bottom:4px;"></div>
+          <div id="currentTimezone" style="font-size:12px; color:#9ca3af;"></div>
+        </div>
+      </section>
+
       <!-- View Tabs -->
       <div class="agenda-tabs">
         <div class="agenda-tab active" data-view="day">📅 Day</div>
         <div class="agenda-tab" data-view="week">📆 Week</div>
+        <div class="agenda-tab" data-view="month">🗓️ Month</div>
       </div>
 
       <!-- Day View -->
@@ -125,6 +456,7 @@
             <button id="prevDay">&lt;</button>
             <button id="nextDay">&gt;</button>
             <button id="todayBtn">Today</button>
+            <button id="timelineToggle" style="background:#374151; color:#9ca3af;">📅 Timeline</button>
           </div>
         </div>
         <div id="dayContent"></div>
@@ -141,6 +473,19 @@
           </div>
         </div>
         <div id="weekContent"></div>
+      </div>
+
+      <!-- Month View -->
+      <div id="monthView" class="agenda-view">
+        <div class="sec-title" style="margin-bottom:16px;">
+          <h3 id="monthTitle">This Month</h3>
+          <div class="row">
+            <button id="prevMonth">&lt;</button>
+            <button id="nextMonth">&gt;</button>
+            <button id="thisMonthBtn">This Month</button>
+          </div>
+        </div>
+        <div id="monthContent"></div>
       </div>
 
       <!-- Quick Plan Section (preserved) -->
@@ -179,6 +524,12 @@
     // Initialize page elements
     const taskForm = document.getElementById('taskForm');
     const taskText = document.getElementById('taskText');
+    const durationInput = document.getElementById('durationInput');
+    const prioritySelect = document.getElementById('prioritySelect');
+    const repeatToggle = document.getElementById('repeatToggle');
+    const recurrenceOptions = document.getElementById('recurrenceOptions');
+    const recurrenceType = document.getElementById('recurrenceType');
+    const customRrule = document.getElementById('customRrule');
     const searchInput = document.getElementById('searchInput');
     const clearSearchBtn = document.getElementById('clearSearch');
     const viewUnscheduledBtn = document.getElementById('viewUnscheduled');
@@ -186,36 +537,98 @@
     const suggestBtn = document.getElementById('suggest');
     const planList = document.getElementById('planList');
 
+    // Clock elements
+    const currentTimeElement = document.getElementById('currentTime');
+    const currentTimezoneElement = document.getElementById('currentTimezone');
+
     // Tab elements
     const tabs = document.querySelectorAll('.agenda-tab');
     const dayView = document.getElementById('dayView');
     const weekView = document.getElementById('weekView');
+    const monthView = document.getElementById('monthView');
     
     // Navigation elements
     const dayTitle = document.getElementById('dayTitle');
     const weekTitle = document.getElementById('weekTitle');
+    const monthTitle = document.getElementById('monthTitle');
     const dayContent = document.getElementById('dayContent');
     const weekContent = document.getElementById('weekContent');
+    const monthContent = document.getElementById('monthContent');
     
     // Day navigation
     const prevDayBtn = document.getElementById('prevDay');
     const nextDayBtn = document.getElementById('nextDay');
     const todayBtn = document.getElementById('todayBtn');
+    const timelineToggle = document.getElementById('timelineToggle');
     
     // Week navigation
     const prevWeekBtn = document.getElementById('prevWeek');
     const nextWeekBtn = document.getElementById('nextWeek');
     const thisWeekBtn = document.getElementById('thisWeekBtn');
+    
+    // Month navigation
+    const prevMonthBtn = document.getElementById('prevMonth');
+    const nextMonthBtn = document.getElementById('nextMonth');
+    const thisMonthBtn = document.getElementById('thisMonthBtn');
 
     // Current view state
     let currentView = 'day';
     let currentDate = new Date();
     let searchQuery = '';
     let showingUnscheduled = false;
+    let timelineMode = false;
+    
+    // Debug mode state
+    const isDebugMode = new URLSearchParams(window.location.search).has('debug');
+    let debugOverlayVisible = false;
+    
+    // Task templates
+    const taskTemplates = {
+      memoria: {
+        title: 'Work on Memoria project',
+        duration: 120,
+        priority: 'high',
+        rrule: null
+      },
+      project: {
+        title: 'Work on personal project',
+        duration: 90,
+        priority: 'medium',
+        rrule: null
+      },
+      research: {
+        title: 'Research something I noted down',
+        duration: 30,
+        priority: 'low',
+        rrule: null
+      },
+      girlfriend: {
+        title: 'Message girlfriend - tell her I love her',
+        duration: 5,
+        priority: 'high',
+        rrule: 'FREQ=DAILY'
+      },
+      break: {
+        title: 'Take a proper break',
+        duration: 30,
+        priority: 'low',
+        rrule: null
+      },
+      planning: {
+        title: 'Plan upcoming day/week',
+        duration: 15,
+        priority: 'medium',
+        rrule: 'FREQ=WEEKLY'
+      }
+    };
     
     // Utility functions
     function formatDate(date) {
-      return date.toISOString().split('T')[0];
+      // Use local date components to avoid timezone offset issues
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
     
     function formatDateTime(date) {
@@ -234,16 +647,108 @@
       return result;
     }
     
+    // Duration parsing functions
+    function parseDuration(durationStr) {
+      if (!durationStr || !durationStr.trim()) return null;
+      
+      const str = durationStr.toLowerCase().trim();
+      let totalMinutes = 0;
+      
+      // Handle formats like "1h 30m", "90m", "1.5h", "30 minutes"
+      const patterns = [
+        /(\d+(?:\.\d+)?)\s*h(?:ours?)?/g,  // hours
+        /(\d+)\s*m(?:in(?:utes?)?)?/g,      // minutes
+      ];
+      
+      // Extract hours
+      const hourMatch = patterns[0].exec(str);
+      if (hourMatch) {
+        totalMinutes += parseFloat(hourMatch[1]) * 60;
+      }
+      
+      // Reset regex and extract minutes
+      patterns[1].lastIndex = 0;
+      const minuteMatch = patterns[1].exec(str);
+      if (minuteMatch) {
+        totalMinutes += parseInt(minuteMatch[1]);
+      }
+      
+      // If no patterns matched, try parsing as pure number (assume minutes)
+      if (totalMinutes === 0) {
+        const numMatch = /^(\d+)$/.exec(str);
+        if (numMatch) {
+          totalMinutes = parseInt(numMatch[1]);
+        }
+      }
+      
+      return totalMinutes > 0 ? totalMinutes : null;
+    }
+    
+    function formatDuration(minutes) {
+      if (!minutes) return '';
+      if (minutes < 60) return `${minutes}m`;
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+    
     function getWeekStart(date) {
       const result = new Date(date);
       const day = result.getDay();
-      const diff = result.getDate() - day;
-      return new Date(result.setDate(diff));
+      // Adjust for Monday start: Monday = 0, Tuesday = 1, ..., Sunday = 6
+      const daysToSubtract = day === 0 ? 6 : day - 1; // If Sunday, go back 6 days, otherwise go back (day - 1)
+      return new Date(result.setDate(result.getDate() - daysToSubtract));
     }
     
     function getWeekEnd(date) {
       const weekStart = getWeekStart(date);
       return addDays(weekStart, 6);
+    }
+
+    // Clock functions
+    function updateClock() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      });
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const shortTimezone = now.toLocaleTimeString('en', {timeZoneName:'short'}).split(' ')[2];
+      
+      currentTimeElement.textContent = timeString;
+      currentTimezoneElement.textContent = `${timezone} (${shortTimezone})`;
+    }
+
+    // Initialize clock and update every second
+    updateClock();
+    setInterval(updateClock, 1000);
+    
+    // Debug mode keyboard handler
+    if (isDebugMode) {
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'D' || e.key === 'd') {
+          e.preventDefault();
+          toggleDebugOverlay();
+        }
+      });
+      
+      // Debug mode resize handler
+      window.addEventListener('resize', () => {
+        if (debugOverlayVisible) {
+          // Reset metrics cache and refresh debug overlay
+          timelineMetrics = null;
+          setTimeout(() => {
+            toggleDebugOverlay(); // Hide
+            setTimeout(() => {
+              toggleDebugOverlay(); // Show with updated metrics
+            }, 50);
+          }, 100);
+        }
+      });
+      
+      console.log('🐛 Debug mode active! Press D to toggle debug overlay.');
     }
 
     // Task management functions
@@ -300,6 +805,92 @@
       }
     }
 
+    // Task management functions
+    async function deleteTask(taskId, isRecurring, isInstance) {
+      try {
+        if (isRecurring && !isInstance) {
+          // Deleting a recurring task (parent)
+          const confirm = window.confirm(
+            'This will delete the entire recurring task series. Are you sure?'
+          );
+          if (!confirm) return;
+        } else if (isInstance) {
+          // Deleting a recurring task instance
+          const confirm = window.confirm(
+            'Delete this single occurrence? The recurring series will continue.'
+          );
+          if (!confirm) return;
+        } else {
+          // Regular task deletion
+          const confirm = window.confirm('Delete this task?');
+          if (!confirm) return;
+        }
+        
+        await window.memoriaAPI.request(`/tasks/${taskId}`, 'DELETE');
+        await refreshCurrentView();
+      } catch (error) {
+        console.error('Failed to delete task:', error);
+        alert('Failed to delete task');
+      }
+    }
+
+    async function editTask(task) {
+      try {
+        // Create edit form
+        const newTitle = prompt('Edit task title:', task.title);
+        if (newTitle === null) return; // User cancelled
+        
+        const updates = { title: newTitle };
+        
+        // Ask about due date
+        const currentDue = task.due ? new Date(task.due).toISOString().slice(0, 16) : '';
+        const newDue = prompt('Edit due date (YYYY-MM-DDTHH:MM, leave empty for no due date):', currentDue);
+        if (newDue !== null) {
+          updates.due = newDue || null;
+        }
+        
+        // Ask about priority
+        const currentPriority = task.priority || 'medium';
+        const priorityChoice = prompt('Edit priority (high, medium, low):', currentPriority);
+        if (priorityChoice !== null && ['high', 'medium', 'low'].includes(priorityChoice.toLowerCase())) {
+          updates.priority = priorityChoice.toLowerCase();
+        }
+        
+        // Ask about duration
+        const currentDuration = task.duration ? formatDuration(task.duration) : '';
+        const durationChoice = prompt('Edit duration (e.g., 1h, 30m, 1h 30m, leave empty for no duration):', currentDuration);
+        if (durationChoice !== null) {
+          const newDuration = parseDuration(durationChoice);
+          updates.duration = newDuration;
+        }
+        
+        // Handle recurrence editing for recurring tasks
+        if (task.rrule || task.is_recurring_instance) {
+          if (task.is_recurring_instance) {
+            const editSeries = confirm('Edit the entire recurring series? (Cancel to edit only this instance)');
+            if (editSeries) {
+              // For instances, we can't directly edit the parent task easily
+              alert('Editing recurring series from instances is not yet supported. Please edit the original task.');
+              return;
+            }
+          } else {
+            // Editing parent recurring task
+            const currentRrule = task.rrule || '';
+            const newRrule = prompt('Edit recurrence rule (RRULE format, leave empty to remove recurrence):', currentRrule);
+            if (newRrule !== null) {
+              updates.rrule = newRrule || null;
+            }
+          }
+        }
+        
+        await window.memoriaAPI.request(`/tasks/${task.id}`, 'PATCH', updates);
+        await refreshCurrentView();
+      } catch (error) {
+        console.error('Failed to edit task:', error);
+        alert('Failed to edit task');
+      }
+    }
+
     // Quick action handlers
     function createQuickActions(task) {
       const actions = document.createElement('div');
@@ -309,6 +900,18 @@
       doneBtn.className = 'quick-action done';
       doneBtn.textContent = 'Done';
       doneBtn.onclick = () => markTaskDone(task.id);
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'quick-action';
+      editBtn.style.background = '#6366f1';
+      editBtn.textContent = '✏️ Edit';
+      editBtn.onclick = () => editTask(task);
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'quick-action';
+      deleteBtn.style.background = '#dc2626';
+      deleteBtn.textContent = '🗑️ Delete';
+      deleteBtn.onclick = () => deleteTask(task.id, !!task.rrule, !!task.is_recurring_instance);
       
       const oneHourBtn = document.createElement('button');
       oneHourBtn.className = 'quick-action reschedule';
@@ -350,13 +953,17 @@
         }
       };
       
-      actions.append(doneBtn, oneHourBtn, oneDayBtn, nextWeekBtn, pickDateBtn);
+      actions.append(doneBtn, editBtn, deleteBtn, oneHourBtn, oneDayBtn, nextWeekBtn, pickDateBtn);
       return actions;
     }
 
     // Render task item
     function renderTask(task) {
       const li = document.createElement('li');
+      
+      // Add priority-based border styling
+      const priority = task.priority || 'medium';
+      li.className = `task-${priority}-priority`;
       
       const left = document.createElement('div');
       left.style.flex = '1';
@@ -365,9 +972,48 @@
       title.textContent = task.title;
       title.className = 'content-text';
       
+      // Add priority badge
+      if (task.priority) {
+        const priorityBadge = document.createElement('span');
+        priorityBadge.className = `priority-badge priority-${task.priority}`;
+        const priorityText = {
+          'high': '🔴 High',
+          'medium': '🟡 Medium', 
+          'low': '🟢 Low'
+        };
+        priorityBadge.textContent = priorityText[task.priority] || '🟡 Medium';
+        priorityBadge.title = `Priority: ${task.priority}`;
+        title.appendChild(priorityBadge);
+      }
+      
+      // Add recurring badge if task has rrule
+      if (task.rrule) {
+        const badge = document.createElement('span');
+        badge.className = 'recurring-badge';
+        badge.textContent = '🔁 Recurring';
+        badge.title = `RRULE: ${task.rrule}`;
+        title.appendChild(badge);
+      }
+      
+      // Add instance indicator for recurring task instances
+      if (task.is_recurring_instance) {
+        const instanceBadge = document.createElement('span');
+        instanceBadge.className = 'recurring-badge';
+        instanceBadge.style.background = '#059669';
+        instanceBadge.textContent = '↻ Instance';
+        instanceBadge.title = `Instance of recurring task #${task.parent_task_id}`;
+        title.appendChild(instanceBadge);
+      }
+      
       const meta = document.createElement('div');
       meta.className = 'tags';
-      const dueText = task.due ? new Date(task.due).toLocaleString() : 'No due date';
+      let dueText = task.due ? new Date(task.due).toLocaleString() : 'No due date';
+      
+      // Add duration information
+      if (task.duration) {
+        dueText += ` • ${formatDuration(task.duration)}`;
+      }
+      
       meta.textContent = dueText + (task.tags ? ' ' + task.tags : '');
       
       left.append(title, meta);
@@ -376,6 +1022,359 @@
       
       li.append(left, right);
       return li;
+    }
+
+    // Timeline measurement system - no magic numbers
+    let timelineMetrics = null;
+    
+    function measureTimelineMetrics() {
+      // Find hour slots in the timeline to measure actual rendered dimensions
+      const hourSlots = document.querySelectorAll('.hour-line[data-hour]');
+      if (hourSlots.length < 2) {
+        console.error('Need at least 2 timeline slots for accurate measurement');
+        return { pxPerMinute: 1, slotHeight: 61 }; // Fallback
+      }
+      
+      // Measure distance between consecutive hour lines for precise slot height
+      const firstSlot = hourSlots[0];
+      const secondSlot = hourSlots[1];
+      
+      const firstRect = firstSlot.getBoundingClientRect();
+      const secondRect = secondSlot.getBoundingClientRect();
+      
+      // Calculate actual slot height by measuring distance between slot tops
+      const actualSlotHeight = secondRect.top - firstRect.top;
+      
+      // Calculate pixels per minute from measured hour slot
+      const pxPerMinute = actualSlotHeight / 60;
+      
+      console.log(`Timeline metrics measured: ${actualSlotHeight}px per hour, ${pxPerMinute}px per minute`);
+      
+      return {
+        pxPerMinute,
+        slotHeight: actualSlotHeight
+      };
+    }
+    
+    function getTimelineMetrics() {
+      if (!timelineMetrics) {
+        timelineMetrics = measureTimelineMetrics();
+      }
+      return timelineMetrics;
+    }
+    
+    // Debug overlay functions
+    function createDebugOverlay() {
+      const timelineContent = document.querySelector('.timeline-content');
+      if (!timelineContent) return null;
+      
+      const overlay = document.createElement('div');
+      overlay.className = 'debug-overlay';
+      overlay.id = 'debugOverlay';
+      
+      const metrics = getTimelineMetrics();
+      
+      // Create guides every 30 minutes from 6 AM to 11 PM
+      // Use precise positioning based on the actual measured slot heights
+      for (let hour = 6; hour <= 23; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+          if (hour === 23 && minute > 0) break; // Don't go past 11 PM
+          
+          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          
+          // Calculate position using the exact same logic as task positioning
+          const slotIndex = hour - 6; // Timeline starts at 6 AM
+          const hourTop = slotIndex * metrics.slotHeight;
+          const minuteOffset = minute * metrics.pxPerMinute;
+          const position = hourTop + minuteOffset;
+          
+          const guide = document.createElement('div');
+          guide.className = 'debug-guide';
+          guide.setAttribute('data-time', timeString);
+          guide.style.top = `${position}px`;
+          
+          overlay.appendChild(guide);
+        }
+      }
+      
+      return overlay;
+    }
+    
+    function createDebugPanel() {
+      const metrics = getTimelineMetrics();
+      const now = new Date();
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      const panel = document.createElement('div');
+      panel.className = 'debug-panel';
+      panel.id = 'debugPanel';
+      
+      panel.innerHTML = `
+        <h4>📊 Debug Timeline Metrics</h4>
+        <div class="metric">
+          <span class="metric-label">pxPerMinute:</span>
+          <span class="metric-value">${metrics.pxPerMinute.toFixed(3)}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">slotHeight:</span>
+          <span class="metric-value">${metrics.slotHeight.toFixed(1)}px</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">dayStart:</span>
+          <span class="metric-value">06:00</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">dayEnd:</span>
+          <span class="metric-value">23:00</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">timezone:</span>
+          <span class="metric-value">${timezone}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">devicePixelRatio:</span>
+          <span class="metric-value">${window.devicePixelRatio}</span>
+        </div>
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #444;">
+          <div style="color: #ffff00; font-size: 10px;">Press D to toggle</div>
+        </div>
+      `;
+      
+      return panel;
+    }
+    
+    function toggleDebugOverlay() {
+      if (!isDebugMode) return;
+      
+      debugOverlayVisible = !debugOverlayVisible;
+      
+      // Remove existing debug elements
+      const existingOverlay = document.getElementById('debugOverlay');
+      const existingPanel = document.getElementById('debugPanel');
+      if (existingOverlay) existingOverlay.remove();
+      if (existingPanel) existingPanel.remove();
+      
+      if (debugOverlayVisible) {
+        // Add debug overlay to timeline
+        const timelineContent = document.querySelector('.timeline-content');
+        if (timelineContent) {
+          const overlay = createDebugOverlay();
+          if (overlay) {
+            timelineContent.appendChild(overlay);
+          }
+        }
+        
+        // Add debug panel to body
+        const panel = createDebugPanel();
+        document.body.appendChild(panel);
+        
+        // Run verification
+        setTimeout(verifyLayout, 100);
+      }
+    }
+    
+    function verifyLayout() {
+      if (!isDebugMode || !debugOverlayVisible) return;
+      
+      const timelineContent = document.querySelector('#agenda-timeline .timeline-content');
+      if (!timelineContent) {
+        console.log('🔍 verifyLayout: No timeline content found');
+        return;
+      }
+      
+      const metrics = getTimelineMetrics();
+      const tasks = timelineContent.querySelectorAll('.task-block[data-id]');
+      
+      let failures = 0;
+      const results = [];
+      
+      console.log('🔍 verifyLayout: Checking positioning accuracy...');
+      console.log(`📏 Using metrics: ${metrics.pxPerMinute.toFixed(3)}px/min, ${metrics.slotHeight.toFixed(1)}px/hour`);
+      
+      tasks.forEach((taskElement, index) => {
+        const taskId = taskElement.dataset.id;
+        const startISO = taskElement.dataset.start;
+        const endISO = taskElement.dataset.end;
+        
+        if (!startISO) {
+          console.log(`⚠️  Task ${taskId}: No start time data attribute found`);
+          return;
+        }
+        
+        const rect = taskElement.getBoundingClientRect();
+        const timelineRect = timelineContent.getBoundingClientRect();
+        
+        // Get current position relative to timeline content
+        const currentTop = rect.top - timelineRect.top;
+        const currentHeight = rect.height;
+        
+        // Parse start time and calculate expected position
+        const startTime = new Date(startISO);
+        const hour = startTime.getHours();
+        const minute = startTime.getMinutes();
+        
+        // Calculate expected position using same logic as task positioning
+        const slotIndex = hour - 6; // Timeline starts at 6 AM
+        const hourTop = slotIndex * metrics.slotHeight;
+        const minuteOffset = minute * metrics.pxPerMinute;
+        const expectedTop = hourTop + minuteOffset;
+        
+        // Check position accuracy
+        const topDiff = Math.abs(currentTop - expectedTop);
+        const topAccurate = topDiff < 1.0;
+        
+        // Check height accuracy if end time is available
+        let expectedHeight = null;
+        let heightAccurate = true;
+        
+        if (endISO) {
+          const endTime = new Date(endISO);
+          const durationMs = endTime.getTime() - startTime.getTime();
+          const durationMinutes = durationMs / (1000 * 60);
+          
+          if (durationMinutes > 0) {
+            expectedHeight = Math.max(durationMinutes * metrics.pxPerMinute, 20);
+            const heightDiff = Math.abs(currentHeight - expectedHeight);
+            heightAccurate = heightDiff < 1.0;
+          }
+        }
+        
+        const result = {
+          taskId: taskId,
+          time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+          currentTop: currentTop.toFixed(1),
+          expectedTop: expectedTop.toFixed(1),
+          topDiff: topDiff.toFixed(1),
+          topAccurate,
+          currentHeight: currentHeight.toFixed(1),
+          expectedHeight: expectedHeight ? expectedHeight.toFixed(1) : 'N/A',
+          heightAccurate
+        };
+        
+        results.push(result);
+        
+        if (!topAccurate || !heightAccurate) {
+          failures++;
+          console.log(`❌ Task ${result.taskId} (${result.time}): Position accuracy failed`);
+          console.log(`   Top: ${result.currentTop}px (expected ${result.expectedTop}px, diff ${result.topDiff}px)`);
+          if (expectedHeight) {
+            console.log(`   Height: ${result.currentHeight}px (expected ${result.expectedHeight}px)`);
+          }
+        } else {
+          console.log(`✅ Task ${result.taskId} (${result.time}): Position accurate`);
+        }
+      });
+      
+      console.log(`🎯 verifyLayout: ${failures} failures out of ${results.length} tasks`);
+      
+      if (failures === 0) {
+        console.log('🎉 All timeline tasks are positioned accurately!');
+      }
+      
+      return { failures, total: results.length, results };
+    }
+    
+    // Timeline drag and drop functions
+    function createTimelineTask(task) {
+      const taskElement = document.createElement('div');
+      taskElement.className = `timeline-task task-block task-${task.priority || 'medium'}-priority`;
+      taskElement.draggable = true;
+      taskElement.dataset.taskId = task.id;
+      taskElement.dataset.id = task.id;
+      
+      // Add data-start and data-end attributes for layout verification
+      if (task.due) {
+        taskElement.dataset.start = new Date(task.due).toISOString();
+        if (task.duration) {
+          const endTime = new Date(new Date(task.due).getTime() + task.duration * 60000);
+          taskElement.dataset.end = endTime.toISOString();
+        }
+      }
+      
+      // Set height based on duration using measured metrics
+      const duration = task.duration || 30; // Default 30 minutes if no duration
+      const metrics = getTimelineMetrics();
+      const heightPixels = Math.max(duration * metrics.pxPerMinute, 20); // Minimum 20px height for visibility
+      taskElement.style.height = `${heightPixels}px`;
+      taskElement.style.maxHeight = `${heightPixels}px`;
+      
+      const content = document.createElement('div');
+      content.className = 'task-content';
+      content.textContent = task.title;
+      
+      // Add priority badge
+      if (task.priority) {
+        const priorityBadge = document.createElement('span');
+        priorityBadge.className = `priority-badge priority-${task.priority}`;
+        const priorityText = {
+          'high': '🔴',
+          'medium': '🟡', 
+          'low': '🟢'
+        };
+        priorityBadge.textContent = priorityText[task.priority] || '🟡';
+        priorityBadge.style.marginLeft = '8px';
+        content.appendChild(priorityBadge);
+      }
+      
+      const timeElement = document.createElement('div');
+      timeElement.className = 'task-time';
+      const startTime = new Date(task.due).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      let timeText = startTime;
+      
+      // Add duration info and end time if duration is specified
+      if (task.duration) {
+        const endTime = new Date(new Date(task.due).getTime() + task.duration * 60000);
+        const endTimeStr = endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        timeText = `${startTime} - ${endTimeStr} (${formatDuration(task.duration)})`;
+      }
+      
+      timeElement.textContent = timeText;
+      
+      taskElement.appendChild(content);
+      taskElement.appendChild(timeElement);
+      
+      // Add drag event listeners
+      taskElement.addEventListener('dragstart', handleDragStart);
+      taskElement.addEventListener('dragend', handleDragEnd);
+      
+      return taskElement;
+    }
+    
+    function handleDragStart(e) {
+      e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
+      e.target.classList.add('dragging');
+    }
+    
+    function handleDragEnd(e) {
+      e.target.classList.remove('dragging');
+    }
+    
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    }
+    
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+    
+    async function handleDrop(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      
+      const taskId = e.dataTransfer.getData('text/plain');
+      const targetHour = parseInt(e.currentTarget.dataset.hour);
+      
+      // Calculate new due date/time
+      const newDate = new Date(currentDate);
+      newDate.setHours(targetHour, 0, 0, 0);
+      
+      try {
+        await rescheduleTask(taskId, formatDateTime(newDate));
+      } catch (error) {
+        console.error('Failed to reschedule task:', error);
+        alert('Failed to reschedule task');
+      }
     }
 
     // Day view functions
@@ -394,6 +1393,113 @@
         currentDate.toDateString();
       dayContent.innerHTML = '';
       
+      if (timelineMode) {
+        renderTimelineView(tasks);
+      } else {
+        renderListView(tasks);
+      }
+    }
+    
+    function renderTimelineView(tasks) {
+      // Create timeline container
+      const timelineContainer = document.createElement('div');
+      timelineContainer.className = 'timeline-container';
+      timelineContainer.id = 'agenda-timeline';
+      
+      const hoursColumn = document.createElement('div');
+      hoursColumn.className = 'timeline-hours';
+      
+      const contentColumn = document.createElement('div');
+      contentColumn.className = 'timeline-content';
+      
+      // Generate time slots (6 AM to 11 PM)
+      for (let hour = 6; hour <= 23; hour++) {
+        const timeLabel = document.createElement('div');
+        timeLabel.className = 'time-label hour-line';
+        timeLabel.dataset.hour = hour; // Add data-hour for measurement
+        timeLabel.textContent = `${hour % 12 === 0 ? 12 : hour % 12}${hour < 12 ? 'AM' : 'PM'}`;
+        hoursColumn.appendChild(timeLabel);
+        
+        const timeSlot = document.createElement('div');
+        timeSlot.className = 'time-slot hour-line';
+        timeSlot.dataset.hour = hour; // Add data-hour for measurement
+        timeSlot.addEventListener('dragover', handleDragOver);
+        timeSlot.addEventListener('drop', handleDrop);
+        timeSlot.addEventListener('dragleave', handleDragLeave);
+        contentColumn.appendChild(timeSlot);
+      }
+      
+      // Add to DOM first so we can measure
+      timelineContainer.appendChild(hoursColumn);
+      timelineContainer.appendChild(contentColumn);
+      dayContent.appendChild(timelineContainer);
+      
+      // Reset metrics cache so it gets remeasured
+      timelineMetrics = null;
+      
+      // Position tasks in timeline with DOM-measured precision
+      for (const task of tasks) {
+        if (task.due) {
+          const taskDate = new Date(task.due);
+          const hour = taskDate.getHours();
+          const minutes = taskDate.getMinutes();
+          
+          if (hour >= 6 && hour <= 23) {
+            const taskElement = createTimelineTask(task);
+            
+            // Calculate precise position using measured metrics
+            const metrics = getTimelineMetrics();
+            const slotIndex = hour - 6; // Timeline starts at 6 AM
+            
+            // Position calculation using measured slot height:
+            // - Start with the top of the hour slot (slotIndex * measured slot height)
+            // - Add minute offset within that hour (minutes * pxPerMinute)
+            const hourTop = slotIndex * metrics.slotHeight;
+            const minuteOffset = minutes * metrics.pxPerMinute;
+            const preciseTotalTop = hourTop + minuteOffset;
+            
+            // Apply positioning
+            taskElement.style.top = `${preciseTotalTop}px`;
+            taskElement.style.position = 'absolute';
+            taskElement.style.left = '8px';
+            taskElement.style.right = '8px';
+            taskElement.style.zIndex = '10';
+            
+            contentColumn.appendChild(taskElement);
+          }
+        }
+      }
+      
+      // Run layout verification in debug mode
+      if (isDebugMode) {
+        setTimeout(verifyLayout, 100);
+      }
+      
+      // Refresh debug overlay if visible
+      if (isDebugMode && debugOverlayVisible) {
+        setTimeout(() => {
+          // Remove existing debug elements from this view
+          const existingOverlay = document.getElementById('debugOverlay');
+          if (existingOverlay) existingOverlay.remove();
+          
+          // Add new debug overlay
+          const overlay = createDebugOverlay();
+          if (overlay) {
+            contentColumn.appendChild(overlay);
+          }
+          
+          // Update debug panel
+          const existingPanel = document.getElementById('debugPanel');
+          if (existingPanel) {
+            existingPanel.remove();
+            const panel = createDebugPanel();
+            document.body.appendChild(panel);
+          }
+        }, 50);
+      }
+    }
+    
+    function renderListView(tasks) {
       // Group tasks by hour
       const hourGroups = {};
       const noTimeGroup = [];
@@ -479,12 +1585,14 @@
       
       // Group tasks by day
       const dayGroups = {};
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       
       for (let i = 0; i < 7; i++) {
         const day = addDays(weekStart, i);
         const dayKey = formatDate(day);
-        const dayName = dayNames[day.getDay()];
+        // Adjust day index for Monday start (Monday = 0, Tuesday = 1, ..., Sunday = 6)
+        const adjustedDayIndex = (day.getDay() + 6) % 7; // Convert Sunday=0 to Sunday=6, Monday=1 to Monday=0, etc.
+        const dayName = dayNames[adjustedDayIndex];
         const displayName = `${dayName} ${day.getDate()}`;
         dayGroups[displayName] = { date: dayKey, tasks: [] };
       }
@@ -529,11 +1637,152 @@
       }
     }
 
+    // Month view functions
+    async function renderMonthView() {
+      if (showingUnscheduled) {
+        await renderUnscheduledView();
+        return;
+      }
+      
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      
+      // Get first day of month and calculate the calendar grid
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const startDate = new Date(firstDay);
+      // Start from Monday instead of Sunday
+      const dayOfWeek = firstDay.getDay();
+      const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday (0), go back 6 days, otherwise go back (dayOfWeek - 1)
+      startDate.setDate(startDate.getDate() - daysToSubtract);
+      
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 41); // 6 weeks * 7 days
+      
+      // Load tasks for the entire month range
+      const start = formatDate(startDate) + 'T00:00:00';
+      const end = formatDate(endDate) + 'T23:59:59';
+      const tasks = await loadTasks(start, end);
+      
+      // Group tasks by date
+      const tasksByDate = {};
+      for (const task of tasks) {
+        if (task.due) {
+          // Fix date parsing to avoid timezone offset issues
+          const taskDate = new Date(task.due);
+          // Use the date components directly to avoid timezone conversion
+          const dateKey = formatDate(new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate()));
+          if (!tasksByDate[dateKey]) tasksByDate[dateKey] = [];
+          tasksByDate[dateKey].push(task);
+        }
+      }
+      
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      
+      monthTitle.textContent = searchQuery ? 
+        `${monthNames[month]} ${year} (filtered)` : 
+        `${monthNames[month]} ${year}`;
+      
+      monthContent.innerHTML = '';
+      
+      // Create calendar grid
+      const calendar = document.createElement('div');
+      calendar.className = 'calendar-grid';
+      
+      // Add day headers - start with Monday
+      const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      for (const header of dayHeaders) {
+        const headerElement = document.createElement('div');
+        headerElement.className = 'calendar-header';
+        headerElement.textContent = header;
+        calendar.appendChild(headerElement);
+      }
+      
+      // Add calendar days
+      const today = formatDate(new Date());
+      const currentCalendarDate = new Date(startDate);
+      
+      for (let i = 0; i < 42; i++) { // 6 weeks
+        const dayElement = document.createElement('div');
+        dayElement.className = 'calendar-day';
+        
+        const dateKey = formatDate(currentCalendarDate);
+        const isCurrentMonth = currentCalendarDate.getMonth() === month;
+        const isToday = dateKey === today;
+        
+        if (!isCurrentMonth) {
+          dayElement.classList.add('other-month');
+        }
+        if (isToday) {
+          dayElement.classList.add('today');
+        }
+        
+        const dayNumber = document.createElement('div');
+        dayNumber.className = 'day-number';
+        dayNumber.textContent = currentCalendarDate.getDate();
+        dayElement.appendChild(dayNumber);
+        
+        // Add tasks for this day
+        const dayTasks = tasksByDate[dateKey] || [];
+        if (dayTasks.length > 0) {
+          const tasksContainer = document.createElement('div');
+          tasksContainer.className = 'day-tasks';
+          
+          // Show up to 3 tasks, then "X more"
+          const maxTasks = 3;
+          for (let j = 0; j < Math.min(dayTasks.length, maxTasks); j++) {
+            const task = dayTasks[j];
+            const taskElement = document.createElement('div');
+            taskElement.className = `calendar-task ${task.priority || 'medium'}`;
+            taskElement.textContent = task.title;
+            taskElement.title = task.title; // Full title on hover
+            tasksContainer.appendChild(taskElement);
+          }
+          
+          if (dayTasks.length > maxTasks) {
+            const moreElement = document.createElement('div');
+            moreElement.className = 'calendar-task-more';
+            moreElement.textContent = `+${dayTasks.length - maxTasks} more`;
+            tasksContainer.appendChild(moreElement);
+          }
+          
+          dayElement.appendChild(tasksContainer);
+        }
+        
+        // Click handler to jump to day view
+        dayElement.addEventListener('click', () => {
+          currentView = 'day';
+          window.currentDate = new Date(currentCalendarDate);
+          switchView('day');
+        });
+        
+        calendar.appendChild(dayElement);
+        currentCalendarDate.setDate(currentCalendarDate.getDate() + 1);
+      }
+      
+      monthContent.appendChild(calendar);
+      
+      if (tasks.length === 0) {
+        const message = searchQuery ? 'No tasks found matching your search' : 'No tasks for this month';
+        const messageElement = document.createElement('p');
+        messageElement.className = 'muted';
+        messageElement.textContent = message;
+        messageElement.style.textAlign = 'center';
+        messageElement.style.marginTop = '20px';
+        monthContent.appendChild(messageElement);
+      }
+    }
+
     // Unscheduled view function
     async function renderUnscheduledView() {
       const tasks = await loadTasks();
-      const container = currentView === 'day' ? dayContent : weekContent;
-      const titleElement = currentView === 'day' ? dayTitle : weekTitle;
+      const container = currentView === 'day' ? dayContent : 
+                       currentView === 'week' ? weekContent : monthContent;
+      const titleElement = currentView === 'day' ? dayTitle : 
+                          currentView === 'week' ? weekTitle : monthTitle;
       
       titleElement.textContent = searchQuery ? 
         'Unscheduled Tasks (filtered)' : 
@@ -575,6 +1824,7 @@
       // Update view visibility
       dayView.classList.toggle('active', view === 'day');
       weekView.classList.toggle('active', view === 'week');
+      monthView.classList.toggle('active', view === 'month');
       
       refreshCurrentView();
     }
@@ -582,14 +1832,24 @@
     async function refreshCurrentView() {
       if (currentView === 'day') {
         await renderDayView();
-      } else {
+      } else if (currentView === 'week') {
         await renderWeekView();
+      } else if (currentView === 'month') {
+        await renderMonthView();
       }
     }
 
     // Event handlers
     tabs.forEach(tab => {
       tab.onclick = () => switchView(tab.dataset.view);
+    });
+    
+    // Template button handlers
+    document.querySelectorAll('.template-btn').forEach(btn => {
+      btn.onclick = () => {
+        const templateKey = btn.dataset.template;
+        applyTemplate(templateKey);
+      };
     });
 
     prevDayBtn.onclick = () => {
@@ -606,6 +1866,13 @@
       currentDate = new Date();
       renderDayView();
     };
+    
+    timelineToggle.onclick = () => {
+      timelineMode = !timelineMode;
+      timelineToggle.textContent = timelineMode ? '📋 List' : '📅 Timeline';
+      timelineToggle.classList.toggle('recurrence-active', timelineMode);
+      renderDayView();
+    };
 
     prevWeekBtn.onclick = () => {
       currentDate = addDays(currentDate, -7);
@@ -620,6 +1887,21 @@
     thisWeekBtn.onclick = () => {
       currentDate = new Date();
       renderWeekView();
+    };
+    
+    prevMonthBtn.onclick = () => {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      renderMonthView();
+    };
+    
+    nextMonthBtn.onclick = () => {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+      renderMonthView();
+    };
+    
+    thisMonthBtn.onclick = () => {
+      currentDate = new Date();
+      renderMonthView();
     };
 
     // Search functionality
@@ -660,14 +1942,102 @@
       refreshCurrentView();
     };
 
+    // Recurrence toggle functionality
+    repeatToggle.onclick = () => {
+      const isVisible = recurrenceOptions.style.display !== 'none';
+      recurrenceOptions.style.display = isVisible ? 'none' : 'block';
+      repeatToggle.classList.toggle('recurrence-active', !isVisible);
+    };
+
+    // Recurrence type change handler
+    recurrenceType.onchange = () => {
+      const isCustom = recurrenceType.value === 'custom';
+      customRrule.style.display = isCustom ? 'block' : 'none';
+      if (!isCustom) {
+        customRrule.value = '';
+      }
+    };
+
+    // Template functionality
+    function applyTemplate(templateKey) {
+      const template = taskTemplates[templateKey];
+      if (!template) return;
+      
+      // Fill form fields with template values
+      taskText.value = template.title;
+      durationInput.value = formatDuration(template.duration);
+      prioritySelect.value = template.priority;
+      
+      // Handle recurrence
+      if (template.rrule) {
+        // Show recurrence options
+        recurrenceOptions.style.display = 'block';
+        repeatToggle.classList.add('recurrence-active');
+        repeatToggle.textContent = '🔁 Active';
+        
+        // Set recurrence type
+        if (template.rrule === 'FREQ=DAILY') {
+          recurrenceType.value = 'FREQ=DAILY';
+        } else if (template.rrule === 'FREQ=WEEKLY') {
+          recurrenceType.value = 'FREQ=WEEKLY';
+        } else if (template.rrule === 'FREQ=MONTHLY') {
+          recurrenceType.value = 'FREQ=MONTHLY';
+        } else {
+          recurrenceType.value = 'custom';
+          customRrule.value = template.rrule;
+          customRrule.style.display = 'block';
+        }
+      } else {
+        // Reset recurrence
+        recurrenceOptions.style.display = 'none';
+        repeatToggle.classList.remove('recurrence-active');
+        repeatToggle.textContent = '🔁 Repeat';
+        recurrenceType.value = '';
+        customRrule.value = '';
+        customRrule.style.display = 'none';
+      }
+      
+      // Focus on title field for further editing
+      taskText.focus();
+      taskText.select();
+    }
+
     taskForm.onsubmit = async (e) => {
       e.preventDefault();
       const title = taskText.value.trim();
       if (!title) return;
       
+      // Get recurrence rule
+      let rrule = null;
+      if (recurrenceType.value === 'custom') {
+        rrule = customRrule.value.trim() || null;
+      } else if (recurrenceType.value) {
+        rrule = recurrenceType.value;
+      }
+      
+      // Get priority
+      const priority = prioritySelect.value;
+      
+      // Get duration
+      const duration = parseDuration(durationInput.value);
+      
       try {
-        await window.memoriaAPI.request('/tasks', 'POST', { title });
+        const taskData = { title, priority };
+        if (rrule) {
+          taskData.rrule = rrule;
+        }
+        if (duration) {
+          taskData.duration = duration;
+        }
+        
+        await window.memoriaAPI.request('/tasks', 'POST', taskData);
         taskText.value = '';
+        durationInput.value = '';
+        prioritySelect.value = 'medium'; // Reset to default
+        recurrenceType.value = '';
+        customRrule.value = '';
+        recurrenceOptions.style.display = 'none';
+        repeatToggle.classList.remove('recurrence-active');
         await refreshCurrentView();
       } catch (error) {
         console.error('Failed to add task:', error);
