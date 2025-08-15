@@ -31,9 +31,21 @@ def init_db():
     done INTEGER NOT NULL DEFAULT 0,
     created TEXT NOT NULL,
     tags TEXT DEFAULT '',
-    notified_at TEXT
+    notified_at TEXT,
+    rrule TEXT
   )""")
   conn.commit()
+  # Ensure schema migration: add rrule column if it doesn't exist (for older DBs)
+  cur.execute("PRAGMA table_info(tasks)")
+  cols = [r[1] for r in cur.fetchall()]
+  if 'rrule' not in cols:
+    try:
+      cur.execute("ALTER TABLE tasks ADD COLUMN rrule TEXT")
+      conn.commit()
+    except Exception:
+      # If alter fails for any reason, ignore and continue; table may already be correct.
+      pass
+
   conn.close()
 
 
