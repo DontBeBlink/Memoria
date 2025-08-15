@@ -387,6 +387,48 @@ def _extract_due(s: str) -> Tuple[str, Optional[str]]:
     d = set_time(d, int(m.group(2)), int(m.group(3) or 0), m.group(4))
     due = d; text = text.replace(m.group(0), " ")
 
+  # on [Month] [Day][st/nd/rd/th] [time] (e.g., "September 1st 11am", "October 15th at 2pm")
+  m = re.search(r"\bon\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?)?\b", text, flags=re.I)
+  if m and not due:
+    month_map = {'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,
+                 'july':7,'august':8,'september':9,'october':10,'november':11,'december':12}
+    month_name = m.group(1).lower()
+    mo = month_map[month_name]
+    da = int(m.group(2))
+    
+    # Determine year - use current year if month hasn't passed, otherwise next year
+    current_year = now.year
+    d = datetime(current_year, mo, da, 9, 0, 0)
+    if d < now.replace(hour=0, minute=0, second=0, microsecond=0):
+      d = d.replace(year=current_year + 1)
+    
+    # Handle time if provided
+    if m.group(3):
+      d = set_time(d, int(m.group(3)), int(m.group(4) or 0), m.group(5))
+    
+    due = d; text = text.replace(m.group(0), " ")
+
+  # [Month] [Day][st/nd/rd/th] [time] (without "on", e.g., "September 1st 11am")
+  m = re.search(r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?)?\b", text, flags=re.I)
+  if m and not due:
+    month_map = {'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,
+                 'july':7,'august':8,'september':9,'october':10,'november':11,'december':12}
+    month_name = m.group(1).lower()
+    mo = month_map[month_name]
+    da = int(m.group(2))
+    
+    # Determine year - use current year if month hasn't passed, otherwise next year
+    current_year = now.year
+    d = datetime(current_year, mo, da, 9, 0, 0)
+    if d < now.replace(hour=0, minute=0, second=0, microsecond=0):
+      d = d.replace(year=current_year + 1)
+    
+    # Handle time if provided
+    if m.group(3):
+      d = set_time(d, int(m.group(3)), int(m.group(4) or 0), m.group(5))
+    
+    due = d; text = text.replace(m.group(0), " ")
+
   # on YYYY-MM-DD [HH:MM]
   m = re.search(r"\bon\s+(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2})(?::(\d{2}))?)?\b", text, flags=re.I)
   if m and not due:

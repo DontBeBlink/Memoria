@@ -78,6 +78,15 @@
     .auth-warning.show { display:block; }
     .nav-links a { color:#60a5fa; text-decoration:none; padding:8px 12px; border:1px solid #374151; border-radius:6px; font-size:14px; }
     .nav-links a:hover { text-decoration:underline; }
+    
+    /* Search and filter specific styles */
+    .search-active { border-color:#f59e0b !important; }
+    .unscheduled-mode .agenda-tab { opacity:0.5; }
+    .unscheduled-mode .agenda-tab.active { opacity:1; background:#f59e0b; border-color:#f59e0b; }
+    .filter-indicator { 
+      display:inline-block; background:#f59e0b; color:white; 
+      padding:2px 6px; border-radius:3px; font-size:11px; margin-left:8px;
+    }
   </style>
 </head>
 <body>
@@ -91,6 +100,15 @@
           <input id="taskText" type="text" placeholder="Add a task... (try 'Meeting Mon 9a' or 'Call client in 2h')" required />
           <button type="submit">Add</button>
         </form>
+      </section>
+
+      <!-- Search and Filter -->
+      <section style="margin-bottom:20px;">
+        <div class="row">
+          <input id="searchInput" type="text" placeholder="Search tasks..." style="flex:1;" />
+          <button id="clearSearch">Clear</button>
+          <button id="viewUnscheduled">View Unscheduled</button>
+        </div>
       </section>
 
       <!-- View Tabs -->
@@ -161,6 +179,9 @@
     // Initialize page elements
     const taskForm = document.getElementById('taskForm');
     const taskText = document.getElementById('taskText');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearch');
+    const viewUnscheduledBtn = document.getElementById('viewUnscheduled');
     const energySel = document.getElementById('energy');
     const suggestBtn = document.getElementById('suggest');
     const planList = document.getElementById('planList');
@@ -189,6 +210,8 @@
     // Current view state
     let currentView = 'day';
     let currentDate = new Date();
+    let searchQuery = '';
+    let showingUnscheduled = false;
     
     // Utility functions
     function formatDate(date) {
@@ -226,11 +249,33 @@
     // Task management functions
     async function loadTasks(start, end) {
       const params = new URLSearchParams({ open_only: 'true' });
-      if (start) params.append('start', start);
-      if (end) params.append('end', end);
+      if (start && !showingUnscheduled) params.append('start', start);
+      if (end && !showingUnscheduled) params.append('end', end);
       
       try {
-        return await window.memoriaAPI.request(`/tasks?${params}`);
+        let tasks = await window.memoriaAPI.request(`/tasks?${params}`);
+        
+        // Filter by search query if provided
+        if (searchQuery) {
+          tasks = tasks.filter(task => 
+            task.title.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        }
+        
+        // Filter unscheduled tasks if requested
+        if (showingUnscheduled) {
+          tasks = tasks.filter(task => !task.due);
+        }
+        
+        // Sort tasks by due date
+        tasks.sort((a, b) => {
+          if (!a.due && !b.due) return 0;
+          if (!a.due) return 1;
+          if (!b.due) return -1;
+          return new Date(a.due) - new Date(b.due);
+        });
+        
+        return tasks;
       } catch (error) {
         console.error('Failed to load tasks:', error);
         return [];
@@ -335,11 +380,18 @@
 
     // Day view functions
     async function renderDayView() {
+      if (showingUnscheduled) {
+        await renderUnscheduledView();
+        return;
+      }
+      
       const start = formatDate(currentDate) + 'T00:00:00';
       const end = formatDate(currentDate) + 'T23:59:59';
       const tasks = await loadTasks(start, end);
       
-      dayTitle.textContent = currentDate.toDateString();
+      dayTitle.textContent = searchQuery ? 
+        `${currentDate.toDateString()} (filtered)` : 
+        currentDate.toDateString();
       dayContent.innerHTML = '';
       
       // Group tasks by hour
@@ -356,6 +408,11 @@
           noTimeGroup.push(task);
         }
       }
+      
+      // Sort tasks within each hour group by minute
+      Object.values(hourGroups).forEach(group => {
+        group.sort((a, b) => new Date(a.due) - new Date(b.due));
+      });
       
       // Render time groups
       const sortedHours = Object.keys(hourGroups).sort();
@@ -393,12 +450,18 @@
       }
       
       if (tasks.length === 0) {
-        dayContent.innerHTML = '<p class="muted">No tasks for this day</p>';
+        const message = searchQuery ? 'No tasks found matching your search' : 'No tasks for this day';
+        dayContent.innerHTML = `<p class="muted">${message}</p>`;
       }
     }
 
     // Week view functions
     async function renderWeekView() {
+      if (showingUnscheduled) {
+        await renderUnscheduledView();
+        return;
+      }
+      
       const weekStart = getWeekStart(currentDate);
       const weekEnd = getWeekEnd(currentDate);
       
@@ -408,7 +471,9 @@
       
       const weekStartStr = weekStart.toLocaleDateString();
       const weekEndStr = weekEnd.toLocaleDateString();
-      weekTitle.textContent = `${weekStartStr} - ${weekEndStr}`;
+      weekTitle.textContent = searchQuery ? 
+        `${weekStartStr} - ${weekEndStr} (filtered)` : 
+        `${weekStartStr} - ${weekEndStr}`;
       
       weekContent.innerHTML = '';
       
@@ -434,6 +499,11 @@
         }
       }
       
+      // Sort tasks within each day by time
+      Object.values(dayGroups).forEach(group => {
+        group.tasks.sort((a, b) => new Date(a.due) - new Date(b.due));
+      });
+      
       // Render day groups
       for (const [dayName, data] of Object.entries(dayGroups)) {
         if (data.tasks.length > 0) {
@@ -454,13 +524,48 @@
       }
       
       if (tasks.length === 0) {
-        weekContent.innerHTML = '<p class="muted">No tasks for this week</p>';
+        const message = searchQuery ? 'No tasks found matching your search' : 'No tasks for this week';
+        weekContent.innerHTML = `<p class="muted">${message}</p>`;
+      }
+    }
+
+    // Unscheduled view function
+    async function renderUnscheduledView() {
+      const tasks = await loadTasks();
+      const container = currentView === 'day' ? dayContent : weekContent;
+      const titleElement = currentView === 'day' ? dayTitle : weekTitle;
+      
+      titleElement.textContent = searchQuery ? 
+        'Unscheduled Tasks (filtered)' : 
+        'Unscheduled Tasks';
+      container.innerHTML = '';
+      
+      if (tasks.length > 0) {
+        const timeGroup = document.createElement('div');
+        timeGroup.className = 'time-group';
+        
+        const timeHeader = document.createElement('h4');
+        timeHeader.textContent = `${tasks.length} unscheduled task${tasks.length === 1 ? '' : 's'}`;
+        timeGroup.append(timeHeader);
+        
+        const taskList = document.createElement('ul');
+        for (const task of tasks) {
+          taskList.append(renderTask(task));
+        }
+        timeGroup.append(taskList);
+        container.append(timeGroup);
+      } else {
+        const message = searchQuery ? 
+          'No unscheduled tasks found matching your search' : 
+          'No unscheduled tasks';
+        container.innerHTML = `<p class="muted">${message}</p>`;
       }
     }
 
     // View management
     function switchView(view) {
       currentView = view;
+      showingUnscheduled = false; // Reset unscheduled view when switching tabs
       
       // Update tab states
       tabs.forEach(tab => {
@@ -515,6 +620,44 @@
     thisWeekBtn.onclick = () => {
       currentDate = new Date();
       renderWeekView();
+    };
+
+    // Search functionality
+    searchInput.oninput = (e) => {
+      searchQuery = e.target.value.trim();
+      
+      // Add visual feedback for active search
+      if (searchQuery) {
+        searchInput.classList.add('search-active');
+      } else {
+        searchInput.classList.remove('search-active');
+      }
+      
+      refreshCurrentView();
+    };
+
+    clearSearchBtn.onclick = () => {
+      searchInput.value = '';
+      searchQuery = '';
+      showingUnscheduled = false;
+      searchInput.classList.remove('search-active');
+      document.body.classList.remove('unscheduled-mode');
+      viewUnscheduledBtn.textContent = 'View Unscheduled';
+      refreshCurrentView();
+    };
+
+    viewUnscheduledBtn.onclick = () => {
+      showingUnscheduled = !showingUnscheduled;
+      viewUnscheduledBtn.textContent = showingUnscheduled ? 'View Scheduled' : 'View Unscheduled';
+      
+      // Add visual feedback for unscheduled mode
+      if (showingUnscheduled) {
+        document.body.classList.add('unscheduled-mode');
+      } else {
+        document.body.classList.remove('unscheduled-mode');
+      }
+      
+      refreshCurrentView();
     };
 
     taskForm.onsubmit = async (e) => {
