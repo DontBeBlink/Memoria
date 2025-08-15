@@ -201,19 +201,25 @@ def delete_task(task_id: str, auth=Depends(require_auth)):
     # Try to parse as integer for regular tasks
     task_id_int = int(task_id)
     deleted = storage.delete_task(task_id_int)
+    if not deleted:
+      raise HTTPException(status_code=404, detail="Not found")
+    return None
   except ValueError:
     # Handle recurring instance IDs (format: {parent_id}_r_{datetime})
     if '_r_' in task_id:
-      # Recurring instances can't be deleted individually in the database
-      # since they're generated dynamically. For now, we'll just return success.
-      # In a real implementation, you might want to store "deleted instances" in a separate table
-      return None
+      # For recurring instances, extract the parent task ID and delete the parent task
+      # This will delete the entire recurring series
+      try:
+        parent_id_str = task_id.split('_r_')[0]
+        parent_id = int(parent_id_str)
+        deleted = storage.delete_task(parent_id)
+        if not deleted:
+          raise HTTPException(status_code=404, detail="Parent recurring task not found")
+        return None
+      except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid recurring task ID format")
     else:
       raise HTTPException(status_code=400, detail="Invalid task ID format")
-  
-  if not deleted:
-    raise HTTPException(status_code=404, detail="Not found")
-  return None
 
 @app.post("/tasks/{task_id}/done")
 def done_task(task_id: str, done: bool = True, auth=Depends(require_auth)):

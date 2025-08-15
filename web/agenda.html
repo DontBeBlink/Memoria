@@ -126,6 +126,7 @@
     .timeline-content {
       position: relative;
       border-left: 2px solid #374151;
+      min-height: 1080px; /* 18 hours * 60px each */
     }
     .time-slot {
       height: 60px;
@@ -309,12 +310,12 @@
       <section style="margin-bottom:16px;">
         <div style="margin-bottom:8px;">
           <span style="color:#9ca3af; font-size:14px; margin-right:12px;">🚀 Quick Templates:</span>
-          <button type="button" class="template-btn" data-template="standup">📅 Daily Standup</button>
-          <button type="button" class="template-btn" data-template="meeting">🤝 Meeting</button>
-          <button type="button" class="template-btn" data-template="focus">🎯 Focus Time</button>
-          <button type="button" class="template-btn" data-template="lunch">🍽️ Lunch Break</button>
-          <button type="button" class="template-btn" data-template="review">📊 Weekly Review</button>
-          <button type="button" class="template-btn" data-template="email">📧 Email Check</button>
+          <button type="button" class="template-btn" data-template="memoria">💻 Work on Memoria</button>
+          <button type="button" class="template-btn" data-template="project">🚀 Personal Project</button>
+          <button type="button" class="template-btn" data-template="research">🔍 Research Topic</button>
+          <button type="button" class="template-btn" data-template="girlfriend">💕 Message Girlfriend</button>
+          <button type="button" class="template-btn" data-template="break">☕ Take a Break</button>
+          <button type="button" class="template-btn" data-template="planning">📝 Plan Day/Week</button>
         </div>
       </section>
       
@@ -497,41 +498,41 @@
     
     // Task templates
     const taskTemplates = {
-      standup: {
-        title: 'Daily standup meeting',
-        duration: 15,
-        priority: 'medium',
-        rrule: 'FREQ=DAILY'
-      },
-      meeting: {
-        title: 'Team meeting',
-        duration: 30,
-        priority: 'medium',
-        rrule: null
-      },
-      focus: {
-        title: 'Deep focus work session',
+      memoria: {
+        title: 'Work on Memoria project',
         duration: 120,
         priority: 'high',
         rrule: null
       },
-      lunch: {
-        title: 'Lunch break',
-        duration: 60,
-        priority: 'low',
-        rrule: 'FREQ=DAILY'
+      project: {
+        title: 'Work on personal project',
+        duration: 90,
+        priority: 'medium',
+        rrule: null
       },
-      review: {
-        title: 'Weekly review and planning',
-        duration: 60,
+      research: {
+        title: 'Research something I noted down',
+        duration: 30,
+        priority: 'low',
+        rrule: null
+      },
+      girlfriend: {
+        title: 'Message girlfriend - tell her I love her',
+        duration: 5,
         priority: 'high',
-        rrule: 'FREQ=WEEKLY'
-      },
-      email: {
-        title: 'Check and respond to emails',
-        duration: 15,
-        priority: 'low',
         rrule: 'FREQ=DAILY'
+      },
+      break: {
+        title: 'Take a proper break',
+        duration: 30,
+        priority: 'low',
+        rrule: null
+      },
+      planning: {
+        title: 'Plan upcoming day/week',
+        duration: 15,
+        priority: 'medium',
+        rrule: 'FREQ=WEEKLY'
       }
     };
     
@@ -893,11 +894,11 @@
       taskElement.draggable = true;
       taskElement.dataset.taskId = task.id;
       
-      // Set height based on duration
+      // Set height based on duration - 1 minute = 1 pixel
       const duration = task.duration || 30; // Default 30 minutes if no duration
-      const heightPixels = (duration / 60) * 60; // 60px per hour
-      taskElement.style.height = `${Math.max(heightPixels, 30)}px`; // Minimum 30px height
-      taskElement.style.minHeight = '30px';
+      const heightPixels = duration; // 1 minute = 1 pixel, so 60 minutes = 60 pixels (1 hour slot)
+      taskElement.style.height = `${Math.max(heightPixels, 20)}px`; // Minimum 20px height for visibility
+      taskElement.style.minHeight = '20px';
       
       const content = document.createElement('div');
       content.className = 'task-content';
@@ -1038,8 +1039,15 @@
           if (hour >= 6 && hour <= 23) {
             const taskElement = createTimelineTask(task);
             const slotIndex = hour - 6;
+            // Each time slot is 60px high, position within that slot based on minutes
             const topOffset = (minutes / 60) * 60; // Position within the hour slot
-            taskElement.style.top = `${slotIndex * 60 + topOffset}px`;
+            const totalTop = slotIndex * 60 + topOffset;
+            taskElement.style.top = `${totalTop}px`;
+            taskElement.style.position = 'absolute';
+            
+            // Ensure proper stacking when multiple tasks are at same time
+            taskElement.style.zIndex = '10';
+            
             contentColumn.appendChild(taskElement);
           }
         }
@@ -1246,14 +1254,14 @@
       
       // Add calendar days
       const today = formatDate(new Date());
-      const currentDate = new Date(startDate);
+      const currentCalendarDate = new Date(startDate);
       
       for (let i = 0; i < 42; i++) { // 6 weeks
         const dayElement = document.createElement('div');
         dayElement.className = 'calendar-day';
         
-        const dateKey = formatDate(currentDate);
-        const isCurrentMonth = currentDate.getMonth() === month;
+        const dateKey = formatDate(currentCalendarDate);
+        const isCurrentMonth = currentCalendarDate.getMonth() === month;
         const isToday = dateKey === today;
         
         if (!isCurrentMonth) {
@@ -1265,7 +1273,7 @@
         
         const dayNumber = document.createElement('div');
         dayNumber.className = 'day-number';
-        dayNumber.textContent = currentDate.getDate();
+        dayNumber.textContent = currentCalendarDate.getDate();
         dayElement.appendChild(dayNumber);
         
         // Add tasks for this day
@@ -1298,12 +1306,12 @@
         // Click handler to jump to day view
         dayElement.addEventListener('click', () => {
           currentView = 'day';
-          window.currentDate = new Date(currentDate);
+          window.currentDate = new Date(currentCalendarDate);
           switchView('day');
         });
         
         calendar.appendChild(dayElement);
-        currentDate.setDate(currentDate.getDate() + 1);
+        currentCalendarDate.setDate(currentCalendarDate.getDate() + 1);
       }
       
       monthContent.appendChild(calendar);
