@@ -7,7 +7,7 @@ class MemoriaUI {
   constructor() {
     this.currentPage = 'hub'; // default
     this.pages = {
-      'hub': { title: 'Hub', href: '/web/index.html' },
+      'hub': { title: 'Hub', href: '/' },
       'memories': { title: 'Memories', href: '/web/memories.html' },
       'agenda': { title: 'Agenda', href: '/web/agenda.html' },
       'backup': { title: 'Backup', href: '/web/backup.html' },
