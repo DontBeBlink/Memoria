@@ -126,7 +126,7 @@
     .timeline-content {
       position: relative;
       border-left: 2px solid #374151;
-      min-height: 1080px; /* 18 hours * 60px each */
+      min-height: 1098px; /* 18 hours * (60px + 1px border) = 18 * 61px = 1098px */
     }
     .time-slot {
       height: 60px;
@@ -363,6 +363,14 @@
         </div>
       </section>
 
+      <!-- Clock and Timezone Display -->
+      <section style="margin-bottom:20px; text-align:center;">
+        <div id="clockDisplay" style="background:#1f2937; border-radius:8px; padding:12px; display:inline-block; border:1px solid #374151;">
+          <div id="currentTime" style="font-size:18px; font-weight:500; color:#60a5fa; margin-bottom:4px;"></div>
+          <div id="currentTimezone" style="font-size:12px; color:#9ca3af;"></div>
+        </div>
+      </section>
+
       <!-- View Tabs -->
       <div class="agenda-tabs">
         <div class="agenda-tab active" data-view="day">📅 Day</div>
@@ -459,6 +467,10 @@
     const suggestBtn = document.getElementById('suggest');
     const planList = document.getElementById('planList');
 
+    // Clock elements
+    const currentTimeElement = document.getElementById('currentTime');
+    const currentTimezoneElement = document.getElementById('currentTimezone');
+
     // Tab elements
     const tabs = document.querySelectorAll('.agenda-tab');
     const dayView = document.getElementById('dayView');
@@ -538,7 +550,11 @@
     
     // Utility functions
     function formatDate(date) {
-      return date.toISOString().split('T')[0];
+      // Use local date components to avoid timezone offset issues
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
     
     function formatDateTime(date) {
@@ -614,6 +630,26 @@
       const weekStart = getWeekStart(date);
       return addDays(weekStart, 6);
     }
+
+    // Clock functions
+    function updateClock() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      });
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const shortTimezone = now.toLocaleTimeString('en', {timeZoneName:'short'}).split(' ')[2];
+      
+      currentTimeElement.textContent = timeString;
+      currentTimezoneElement.textContent = `${timezone} (${shortTimezone})`;
+    }
+
+    // Initialize clock and update every second
+    updateClock();
+    setInterval(updateClock, 1000);
 
     // Task management functions
     async function loadTasks(start, end) {
@@ -1040,9 +1076,10 @@
           if (hour >= 6 && hour <= 23) {
             const taskElement = createTimelineTask(task);
             const slotIndex = hour - 6;
-            // Each time slot is 60px high, position within that slot based on minutes
-            const topOffset = (minutes / 60) * 60; // Position within the hour slot
-            const totalTop = slotIndex * 60 + topOffset;
+            // Each time slot is 60px high + 1px border = 61px total per slot
+            // Position within that slot based on minutes (60px usable space per hour)
+            const minuteOffset = (minutes / 60) * 60; // Position within the hour slot (0-60px)
+            const totalTop = slotIndex * 61 + minuteOffset; // Account for 1px border per slot
             taskElement.style.top = `${totalTop}px`;
             taskElement.style.position = 'absolute';
             
