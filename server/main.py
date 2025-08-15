@@ -135,12 +135,21 @@ def delete_memory(memory_id: int, auth=Depends(require_auth)):
   return None
 
 @app.get("/tasks")
-def get_tasks(open_only: bool = False, auth=Depends(require_auth)):
-  return storage.list_tasks(open_only=open_only)
+def get_tasks(open_only: bool = False, start: Optional[str] = None, end: Optional[str] = None, auth=Depends(require_auth)):
+  return storage.list_tasks(open_only=open_only, start=start, end=end)
 
 @app.post("/tasks")
 def post_task(task: TaskIn, auth=Depends(require_auth)):
-  return storage.add_task(task.title, task.due)
+  # Extract due date from title if not explicitly provided
+  due = task.due
+  if not due:
+    cleaned_title, extracted_due = _extract_due(task.title)
+    if extracted_due:
+      due = extracted_due
+      # Use cleaned title without date information
+      return storage.add_task(cleaned_title, due)
+  
+  return storage.add_task(task.title, due)
 
 @app.patch("/tasks/{task_id}")
 def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
@@ -312,21 +321,29 @@ def _extract_due(s: str) -> Tuple[str, Optional[str]]:
     return d.replace(hour=H, minute=M, second=0, microsecond=0)
 
   # in X minutes/hours/days
-  m = re.search(r"\bin\s+(\d{1,3})\s*(minutes?|mins?|hours?|hrs?|days?)\b", text, flags=re.I)
+  m = re.search(r"\bin\s*(\d{1,3})\s*(minutes?|mins?|m|hours?|hrs?|h|days?|d)\b", text, flags=re.I)
   if m and not due:
     num = int(m.group(1)); unit = m.group(2).lower()
     d = now
-    if unit.startswith("min"): d += timedelta(minutes=num)
-    elif unit.startswith("hour") or unit.startswith("hr"): d += timedelta(hours=num)
-    elif unit.startswith("day"): d += timedelta(days=num)
+    if unit.startswith("min") or unit == "m": d += timedelta(minutes=num)
+    elif unit.startswith("hour") or unit.startswith("hr") or unit == "h": d += timedelta(hours=num)
+    elif unit.startswith("day") or unit == "d": d += timedelta(days=num)
     due = d; text = text.replace(m.group(0), " ")
 
-  # tomorrow [at time]
-  m = re.search(r"\btomorrow(?:\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?\b", text, flags=re.I)
+  # tomorrow [at time] or tomorrow [morning/afternoon/evening/night]
+  m = re.search(r"\btomorrow(?:\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?|\s+(morning|afternoon|evening|night))?\b", text, flags=re.I)
   if m and not due:
     d = now + timedelta(days=1)
-    if m.group(1): d = set_time(d, int(m.group(1)), int(m.group(2) or 0), m.group(3))
-    else: d = set_time(d, 9, 0, None)
+    if m.group(1):  # specific time like "tomorrow at 3pm"
+      d = set_time(d, int(m.group(1)), int(m.group(2) or 0), m.group(3))
+    elif m.group(4):  # time of day like "tomorrow evening"
+      time_of_day = m.group(4).lower()
+      if time_of_day == "morning": d = set_time(d, 9, 0, None)
+      elif time_of_day == "afternoon": d = set_time(d, 14, 0, None)
+      elif time_of_day == "evening": d = set_time(d, 18, 0, None)
+      elif time_of_day == "night": d = set_time(d, 21, 0, None)
+    else:
+      d = set_time(d, 9, 0, None)
     due = d; text = text.replace(m.group(0), " ")
 
   # today at hh:mm
@@ -345,6 +362,29 @@ def _extract_due(s: str) -> Tuple[str, Optional[str]]:
     d = now + timedelta(days=delta)
     if m.group(2): d = set_time(d, int(m.group(2)), int(m.group(3) or 0), m.group(4))
     else: d = set_time(d, 9, 0, None)
+    due = d; text = text.replace(m.group(0), " ")
+
+  # weekday with time (e.g., "Mon 9a", "Tuesday 3:30pm")
+  m = re.search(r"\b(sun|mon|tue|wed|thu|fri|sat|sunday|monday|tuesday|wednesday|thursday|friday|saturday)(?:day)?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?\b", text, flags=re.I)
+  if m and not due:
+    wd_map = {'sun':6,'mon':0,'tue':1,'wed':2,'thu':3,'fri':4,'sat':5,
+              'sunday':6,'monday':0,'tuesday':1,'wednesday':2,'thursday':3,'friday':4,'saturday':5}
+    weekday_str = m.group(1).lower()
+    target = wd_map[weekday_str]
+    
+    # Calculate days until target weekday
+    delta = (target - now.weekday()) % 7
+    if delta == 0:  # If it's the same weekday, assume next week unless time is in the future
+      time_hour = int(m.group(2))
+      ap = m.group(4)
+      if ap and ap.lower() in ['pm', 'p'] and time_hour < 12: time_hour += 12
+      if ap and ap.lower() in ['am', 'a'] and time_hour == 12: time_hour = 0
+      
+      if time_hour < now.hour or (time_hour == now.hour and int(m.group(3) or 0) <= now.minute):
+        delta = 7  # Next week
+    
+    d = now + timedelta(days=delta)
+    d = set_time(d, int(m.group(2)), int(m.group(3) or 0), m.group(4))
     due = d; text = text.replace(m.group(0), " ")
 
   # on YYYY-MM-DD [HH:MM]

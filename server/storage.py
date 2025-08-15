@@ -98,12 +98,31 @@ def list_memories(limit: int = 100, offset: int = 0, query: Optional[str] = None
     "total": total
   }
 
-def list_tasks(open_only: bool = False, limit: int = 200):
+def list_tasks(open_only: bool = False, limit: int = 200, start: Optional[str] = None, end: Optional[str] = None):
   conn = _connect()
+  
+  # Build query with optional date range filtering
+  conditions = []
+  params = []
+  
   if open_only:
-    rows = conn.execute("SELECT * FROM tasks WHERE done=0 ORDER BY COALESCE(due, '9999') ASC, id DESC LIMIT ?", (limit,)).fetchall()
-  else:
-    rows = conn.execute("SELECT * FROM tasks ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    conditions.append("done=0")
+  
+  if start:
+    conditions.append("due >= ?")
+    params.append(start)
+    
+  if end:
+    conditions.append("due <= ?")
+    params.append(end)
+  
+  where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+  order_clause = " ORDER BY COALESCE(due, '9999') ASC, id DESC" if open_only else " ORDER BY id DESC"
+  
+  params.append(limit)
+  query = f"SELECT * FROM tasks{where_clause}{order_clause} LIMIT ?"
+  
+  rows = conn.execute(query, params).fetchall()
   conn.close()
   return [dict(r) for r in rows]
 
