@@ -276,6 +276,28 @@
       text-align: center;
       padding: 1px;
     }
+    
+    /* Template buttons */
+    .template-btn {
+      padding: 6px 12px;
+      margin: 0 4px 4px 0;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      background: #1f2937;
+      color: #e5e7eb;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+    .template-btn:hover {
+      background: #374151;
+      border-color: #4b5563;
+    }
+    .template-btn:active {
+      background: #2563eb;
+      border-color: #3b82f6;
+    }
   </style>
 </head>
 <body>
@@ -283,6 +305,19 @@
   <div id="authWarningContainer"></div>
   <main>
     <div class="agenda-container">
+      <!-- Quick Templates -->
+      <section style="margin-bottom:16px;">
+        <div style="margin-bottom:8px;">
+          <span style="color:#9ca3af; font-size:14px; margin-right:12px;">🚀 Quick Templates:</span>
+          <button type="button" class="template-btn" data-template="standup">📅 Daily Standup</button>
+          <button type="button" class="template-btn" data-template="meeting">🤝 Meeting</button>
+          <button type="button" class="template-btn" data-template="focus">🎯 Focus Time</button>
+          <button type="button" class="template-btn" data-template="lunch">🍽️ Lunch Break</button>
+          <button type="button" class="template-btn" data-template="review">📊 Weekly Review</button>
+          <button type="button" class="template-btn" data-template="email">📧 Email Check</button>
+        </div>
+      </section>
+      
       <!-- Add Task Form -->
       <section style="margin-bottom:20px;">
         <form id="taskForm">
@@ -459,6 +494,46 @@
     let searchQuery = '';
     let showingUnscheduled = false;
     let timelineMode = false;
+    
+    // Task templates
+    const taskTemplates = {
+      standup: {
+        title: 'Daily standup meeting',
+        duration: 15,
+        priority: 'medium',
+        rrule: 'FREQ=DAILY'
+      },
+      meeting: {
+        title: 'Team meeting',
+        duration: 30,
+        priority: 'medium',
+        rrule: null
+      },
+      focus: {
+        title: 'Deep focus work session',
+        duration: 120,
+        priority: 'high',
+        rrule: null
+      },
+      lunch: {
+        title: 'Lunch break',
+        duration: 60,
+        priority: 'low',
+        rrule: 'FREQ=DAILY'
+      },
+      review: {
+        title: 'Weekly review and planning',
+        duration: 60,
+        priority: 'high',
+        rrule: 'FREQ=WEEKLY'
+      },
+      email: {
+        title: 'Check and respond to emails',
+        duration: 15,
+        priority: 'low',
+        rrule: 'FREQ=DAILY'
+      }
+    };
     
     // Utility functions
     function formatDate(date) {
@@ -1311,6 +1386,14 @@
     tabs.forEach(tab => {
       tab.onclick = () => switchView(tab.dataset.view);
     });
+    
+    // Template button handlers
+    document.querySelectorAll('.template-btn').forEach(btn => {
+      btn.onclick = () => {
+        const templateKey = btn.dataset.template;
+        applyTemplate(templateKey);
+      };
+    });
 
     prevDayBtn.onclick = () => {
       currentDate = addDays(currentDate, -1);
@@ -1417,6 +1500,50 @@
         customRrule.value = '';
       }
     };
+
+    // Template functionality
+    function applyTemplate(templateKey) {
+      const template = taskTemplates[templateKey];
+      if (!template) return;
+      
+      // Fill form fields with template values
+      taskText.value = template.title;
+      durationInput.value = formatDuration(template.duration);
+      prioritySelect.value = template.priority;
+      
+      // Handle recurrence
+      if (template.rrule) {
+        // Show recurrence options
+        recurrenceOptions.style.display = 'block';
+        repeatToggle.classList.add('recurrence-active');
+        repeatToggle.textContent = '🔁 Active';
+        
+        // Set recurrence type
+        if (template.rrule === 'FREQ=DAILY') {
+          recurrenceType.value = 'FREQ=DAILY';
+        } else if (template.rrule === 'FREQ=WEEKLY') {
+          recurrenceType.value = 'FREQ=WEEKLY';
+        } else if (template.rrule === 'FREQ=MONTHLY') {
+          recurrenceType.value = 'FREQ=MONTHLY';
+        } else {
+          recurrenceType.value = 'custom';
+          customRrule.value = template.rrule;
+          customRrule.style.display = 'block';
+        }
+      } else {
+        // Reset recurrence
+        recurrenceOptions.style.display = 'none';
+        repeatToggle.classList.remove('recurrence-active');
+        repeatToggle.textContent = '🔁 Repeat';
+        recurrenceType.value = '';
+        customRrule.value = '';
+        customRrule.style.display = 'none';
+      }
+      
+      // Focus on title field for further editing
+      taskText.focus();
+      taskText.select();
+    }
 
     taskForm.onsubmit = async (e) => {
       e.preventDefault();
