@@ -933,11 +933,11 @@
       taskElement.draggable = true;
       taskElement.dataset.taskId = task.id;
       
-      // Set height based on duration - scale to fit exactly in time slots
+      // Set height based on duration with accurate slot scaling
       const duration = task.duration || 30; // Default 30 minutes if no duration
-      // Each hour slot is 61px total (60px content + 1px border), with 60px usable space for content
-      // Scale duration: 60 minutes = 60px usable space
-      const heightPixels = Math.max((duration / 60) * 60, 20); // Minimum 20px height for visibility
+      // Each hour slot is exactly 61px (60px content + 1px border)
+      // Scale duration: 60 minutes = 61px total slot height
+      const heightPixels = Math.max((duration / 60) * 61, 20); // Minimum 20px height for visibility
       taskElement.style.height = `${heightPixels}px`;
       taskElement.style.maxHeight = `${heightPixels}px`;
       
@@ -1070,7 +1070,7 @@
         contentColumn.appendChild(timeSlot);
       }
       
-      // Position tasks in timeline
+      // Position tasks in timeline with pixel-perfect accuracy
       for (const task of tasks) {
         if (task.due) {
           const taskDate = new Date(task.due);
@@ -1079,22 +1079,26 @@
           
           if (hour >= 6 && hour <= 23) {
             const taskElement = createTimelineTask(task);
+            
+            // Calculate precise position based on time slot boundaries
+            // Timeline starts at 6 AM, so we need to offset from that
             const slotIndex = hour - 6;
             
-            // Calculate position using actual time slot dimensions
-            // Each time slot is 61px tall (60px content + 1px border)
-            const SLOT_HEIGHT = 61; // Actual rendered height per time slot (60px + 1px border)
-            const hourTop = slotIndex * SLOT_HEIGHT;
-            // Add minute offset within the hour (proportional to 60px content area)
-            const minuteOffset = (minutes / 60) * 60; // Scale minutes to 60px content area
-            const totalTop = hourTop + minuteOffset;
+            // Each time slot is exactly 61px tall (60px content + 1px bottom border)
+            const SLOT_HEIGHT = 61;
             
-            taskElement.style.top = `${totalTop}px`;
+            // Position calculation:
+            // - Start with the top of the hour slot (slotIndex * SLOT_HEIGHT)
+            // - Add minute offset within that hour (minutes/60 * SLOT_HEIGHT)
+            const hourTop = slotIndex * SLOT_HEIGHT;
+            const minuteOffset = (minutes / 60) * SLOT_HEIGHT;
+            const preciseTotalTop = hourTop + minuteOffset;
+            
+            // Apply positioning
+            taskElement.style.top = `${preciseTotalTop}px`;
             taskElement.style.position = 'absolute';
             taskElement.style.left = '8px';
             taskElement.style.right = '8px';
-            
-            // Ensure proper stacking when multiple tasks are at same time
             taskElement.style.zIndex = '10';
             
             contentColumn.appendChild(taskElement);
