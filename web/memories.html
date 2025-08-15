@@ -53,6 +53,21 @@
     .status-message { background:#1f2937; color:#e5e7eb; padding:8px 12px; border-radius:6px; font-size:12px; display:none; margin-left:8px; }
     .nav-links a { color:#60a5fa; text-decoration:none; padding:8px 12px; border:1px solid #374151; border-radius:6px; font-size:14px; }
     .nav-links a:hover { text-decoration:underline; }
+    .filter-chips { display:flex; gap:4px; flex-wrap:wrap; margin:8px 0; }
+    .chip { background:#374151; color:#e5e7eb; border-radius:999px; padding:4px 8px; font-size:12px; cursor:pointer; border:1px solid transparent; }
+    .chip:hover { background:#4b5563; }
+    .chip.active { background:#2563eb; border-color:#3b82f6; }
+    .chip.removable { padding-right:6px; }
+    .chip .remove { margin-left:4px; color:#9ca3af; font-weight:bold; }
+    .chip .remove:hover { color:#fff; }
+    .bulk-actions { background:#1f2937; border-radius:8px; padding:8px; margin:8px 0; display:none; align-items:center; gap:8px; }
+    .bulk-actions.show { display:flex; }
+    .select-all-container { margin:8px 0; }
+    .memory-checkbox { margin-right:8px; }
+    .error-banner { background:#dc2626; color:white; padding:8px 12px; border-radius:6px; margin:8px 0; display:none; }
+    .error-banner.show { display:block; }
+    .success-banner { background:#059669; color:white; padding:8px 12px; border-radius:6px; margin:8px 0; display:none; }
+    .success-banner.show { display:block; }
   </style>
 </head>
 <body>
@@ -72,6 +87,26 @@
         <input id="memSearch" type="text" placeholder="Search memories..." style="flex:1;" />
         <button id="memSearchBtn">Search</button>
         <button id="memClearBtn">Clear</button>
+      </div>
+      
+      <!-- Error/Success Banners -->
+      <div id="errorBanner" class="error-banner"></div>
+      <div id="successBanner" class="success-banner"></div>
+      
+      <!-- Filter Chips -->
+      <div id="filterChips" class="filter-chips"></div>
+      
+      <!-- Bulk Actions -->
+      <div class="select-all-container">
+        <label>
+          <input type="checkbox" id="selectAll" class="memory-checkbox" />
+          Select All
+        </label>
+      </div>
+      <div id="bulkActions" class="bulk-actions">
+        <span><span id="selectedCount">0</span> selected</span>
+        <button id="bulkDeleteBtn" style="background:#dc2626;">Delete Selected</button>
+        <button id="bulkDeselectBtn">Deselect All</button>
       </div>
       <div id="memPagination" class="row" style="justify-content:space-between; margin:8px 0;">
         <button id="memPrevBtn">← Previous</button>
@@ -111,11 +146,23 @@
     const memPrevBtn = document.getElementById('memPrevBtn');
     const memNextBtn = document.getElementById('memNextBtn');
     const memPageInfo = document.getElementById('memPageInfo');
+    const filterChips = document.getElementById('filterChips');
+    const selectAll = document.getElementById('selectAll');
+    const bulkActions = document.getElementById('bulkActions');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const bulkDeselectBtn = document.getElementById('bulkDeselectBtn');
+    const selectedCount = document.getElementById('selectedCount');
+    const errorBanner = document.getElementById('errorBanner');
+    const successBanner = document.getElementById('successBanner');
 
     // Pagination state
     let memCurrentPage = 0;
     let memCurrentQuery = '';
-    const memPerPage = 50;
+    let memCurrentTags = [];
+    let memCurrentPeople = [];
+    let memTotal = 0;
+    const memPerPage = 20;
+    let selectedMemories = new Set();
 
     // Voice dictation initialization
     function initializeDictation() {
@@ -129,6 +176,150 @@
       );
     }
 
+    // Banner functions
+    function showErrorBanner(message) {
+      errorBanner.textContent = message;
+      errorBanner.classList.add('show');
+      successBanner.classList.remove('show');
+      setTimeout(() => errorBanner.classList.remove('show'), 5000);
+    }
+
+    function showSuccessBanner(message) {
+      successBanner.textContent = message;
+      successBanner.classList.add('show');
+      errorBanner.classList.remove('show');
+      setTimeout(() => successBanner.classList.remove('show'), 3000);
+    }
+
+    // Filter chip functions
+    function renderFilterChips() {
+      filterChips.innerHTML = '';
+      
+      // Add tag chips
+      memCurrentTags.forEach(tag => {
+        const chip = document.createElement('div');
+        chip.className = 'chip active removable';
+        chip.innerHTML = `#${tag} <span class="remove" onclick="removeTagFilter('${tag}')">×</span>`;
+        filterChips.appendChild(chip);
+      });
+      
+      // Add people chips
+      memCurrentPeople.forEach(person => {
+        const chip = document.createElement('div');
+        chip.className = 'chip active removable';
+        chip.innerHTML = `@${person} <span class="remove" onclick="removePeopleFilter('${person}')">×</span>`;
+        filterChips.appendChild(chip);
+      });
+    }
+
+    function removeTagFilter(tag) {
+      memCurrentTags = memCurrentTags.filter(t => t !== tag);
+      memCurrentPage = 0;
+      renderFilterChips();
+      loadMemories();
+    }
+
+    function removePeopleFilter(person) {
+      memCurrentPeople = memCurrentPeople.filter(p => p !== person);
+      memCurrentPage = 0;
+      renderFilterChips();
+      loadMemories();
+    }
+
+    function extractAndShowFilters(memories) {
+      // Extract unique tags and people from current results
+      const allTags = new Set();
+      const allPeople = new Set();
+      
+      memories.forEach(mem => {
+        if (mem.tags) {
+          const tags = mem.tags.split(' ');
+          tags.forEach(tag => {
+            if (tag.startsWith('#')) {
+              allTags.add(tag.substring(1));
+            } else if (tag.startsWith('@')) {
+              allPeople.add(tag.substring(1));
+            }
+          });
+        }
+      });
+      
+      // Add clickable filter chips for available filters (only if not already filtered)
+      allTags.forEach(tag => {
+        if (!memCurrentTags.includes(tag)) {
+          const chip = document.createElement('div');
+          chip.className = 'chip';
+          chip.textContent = `#${tag}`;
+          chip.onclick = () => addTagFilter(tag);
+          filterChips.appendChild(chip);
+        }
+      });
+      
+      allPeople.forEach(person => {
+        if (!memCurrentPeople.includes(person)) {
+          const chip = document.createElement('div');
+          chip.className = 'chip';
+          chip.textContent = `@${person}`;
+          chip.onclick = () => addPeopleFilter(person);
+          filterChips.appendChild(chip);
+        }
+      });
+    }
+
+    function addTagFilter(tag) {
+      if (!memCurrentTags.includes(tag)) {
+        memCurrentTags.push(tag);
+        memCurrentPage = 0;
+        renderFilterChips();
+        loadMemories();
+      }
+    }
+
+    function addPeopleFilter(person) {
+      if (!memCurrentPeople.includes(person)) {
+        memCurrentPeople.push(person);
+        memCurrentPage = 0;
+        renderFilterChips();
+        loadMemories();
+      }
+    }
+
+    // Bulk operations
+    function updateBulkActions() {
+      const count = selectedMemories.size;
+      selectedCount.textContent = count;
+      bulkActions.classList.toggle('show', count > 0);
+      
+      // Update select all checkbox state
+      const allVisible = Array.from(memList.querySelectorAll('.memory-checkbox')).length;
+      const allSelected = Array.from(memList.querySelectorAll('.memory-checkbox:checked')).length;
+      selectAll.checked = allVisible > 0 && allSelected === allVisible;
+      selectAll.indeterminate = allSelected > 0 && allSelected < allVisible;
+    }
+
+    function selectAllMemories() {
+      const checkboxes = memList.querySelectorAll('.memory-checkbox');
+      checkboxes.forEach(cb => {
+        cb.checked = selectAll.checked;
+        const memoryId = cb.dataset.memoryId;
+        if (selectAll.checked) {
+          selectedMemories.add(memoryId);
+        } else {
+          selectedMemories.delete(memoryId);
+        }
+      });
+      updateBulkActions();
+    }
+
+    function deselectAllMemories() {
+      selectedMemories.clear();
+      const checkboxes = memList.querySelectorAll('.memory-checkbox');
+      checkboxes.forEach(cb => cb.checked = false);
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+      updateBulkActions();
+    }
+
     // Memory functions
     async function loadMemories() {
       try {
@@ -136,18 +327,38 @@
         if (memCurrentQuery) {
           params.append('q', memCurrentQuery);
         }
+        if (memCurrentTags.length > 0) {
+          params.append('tags', memCurrentTags.join(','));
+        }
+        if (memCurrentPeople.length > 0) {
+          params.append('people', memCurrentPeople.join(','));
+        }
         params.append('offset', memCurrentPage * memPerPage);
         params.append('limit', memPerPage);
 
-        const memories = await window.memoriaAPI.request(`/memories?${params}`);
+        const result = await window.memoriaAPI.request(`/memories?${params}`);
+        const memories = result.items || [];
+        memTotal = result.total || 0;
+        
         renderList(memList, memories, 'memory');
         
         // Update pagination info
-        memPageInfo.textContent = `Page ${memCurrentPage + 1}`;
+        const totalPages = Math.ceil(memTotal / memPerPage);
+        memPageInfo.textContent = `Page ${memCurrentPage + 1} of ${totalPages} (${memTotal} total)`;
         memPrevBtn.disabled = memCurrentPage === 0;
-        memNextBtn.disabled = memories.length < memPerPage;
+        memNextBtn.disabled = memCurrentPage >= totalPages - 1;
+        
+        // Update filter chips
+        renderFilterChips();
+        extractAndShowFilters(memories);
+        
+        // Clear selections when loading new data
+        selectedMemories.clear();
+        updateBulkActions();
+        
       } catch (error) {
         console.error('Failed to load memories:', error);
+        showErrorBanner('Failed to load memories: ' + error.message);
       }
     }
 
@@ -161,6 +372,21 @@
         const left = document.createElement('div'); 
         left.className = 'row';
         left.style.flex = '1';
+        
+        // Add checkbox for bulk selection
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'memory-checkbox';
+        checkbox.dataset.memoryId = it.id;
+        checkbox.checked = selectedMemories.has(it.id.toString());
+        checkbox.onchange = (e) => {
+          if (e.target.checked) {
+            selectedMemories.add(it.id.toString());
+          } else {
+            selectedMemories.delete(it.id.toString());
+          }
+          updateBulkActions();
+        };
         
         const contentContainer = document.createElement('div');
         contentContainer.style.flex = '1';
@@ -181,7 +407,7 @@
         editIcon.title = 'Edit';
         editIcon.onclick = () => startEdit(li, type, it);
         
-        left.append(contentContainer, editIcon);
+        left.append(checkbox, contentContainer, editIcon);
         
         const right = document.createElement('div'); 
         right.className = 'row';
@@ -190,8 +416,14 @@
         deleteBtn.textContent = '🗑️';
         deleteBtn.onclick = async () => { 
           if (confirm('Delete this memory?')) {
-            await window.memoriaAPI.request(`/memories/${it.id}`, 'DELETE');
-            await loadMemories();
+            try {
+              await window.memoriaAPI.request(`/memories/${it.id}`, 'DELETE');
+              await loadMemories();
+              showSuccessBanner('Memory deleted successfully');
+            } catch (error) {
+              console.error('Failed to delete memory:', error);
+              showErrorBanner('Failed to delete memory: ' + error.message);
+            }
           }
         };
         right.append(deleteBtn);
@@ -202,21 +434,100 @@
     }
 
     function startEdit(li, type, item) {
-      // Simple edit implementation - could be enhanced
-      const newText = prompt('Edit:', item.text || item.title);
-      if (newText && newText !== (item.text || item.title)) {
-        saveEdit(li, type, item.id, newText);
-      }
+      // Find the content text element
+      const contentText = li.querySelector('.content-text');
+      const originalText = item.text || item.title;
+      
+      // Create inline input
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'inline-input';
+      input.value = originalText;
+      
+      // Create action buttons
+      const actions = document.createElement('div');
+      actions.className = 'edit-actions';
+      
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = '✓';
+      saveBtn.className = 'save-btn';
+      saveBtn.title = 'Save';
+      
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = '✕';
+      cancelBtn.className = 'cancel-btn';
+      cancelBtn.title = 'Cancel';
+      
+      actions.append(saveBtn, cancelBtn);
+      
+      // Replace content with input and actions
+      const originalContent = contentText.innerHTML;
+      contentText.innerHTML = '';
+      contentText.appendChild(input);
+      contentText.appendChild(actions);
+      
+      // Add editing class
+      li.classList.add('editing');
+      
+      // Focus input and select all
+      input.focus();
+      input.select();
+      
+      // Save function
+      const save = async () => {
+        const newText = input.value.trim();
+        if (newText && newText !== originalText) {
+          li.classList.add('unsaved');
+          try {
+            await saveEdit(li, type, item.id, newText);
+            showSuccessBanner('Memory updated successfully');
+          } catch (error) {
+            // Error handling is in saveEdit function
+          }
+        } else {
+          cancel();
+        }
+      };
+      
+      // Cancel function
+      const cancel = () => {
+        contentText.innerHTML = originalContent;
+        li.classList.remove('editing', 'unsaved');
+      };
+      
+      // Event handlers
+      saveBtn.onclick = save;
+      cancelBtn.onclick = cancel;
+      
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          save();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancel();
+        }
+      };
+      
+      // Auto-cancel on blur (with small delay to allow clicking save button)
+      input.onblur = (e) => {
+        setTimeout(() => {
+          if (!actions.contains(document.activeElement)) {
+            cancel();
+          }
+        }, 150);
+      };
     }
 
     async function saveEdit(li, type, id, newValue) {
       try {
         if (type === 'memory') {
-          await window.memoriaAPI.request(`/memories/${id}`, 'PUT', { text: newValue });
+          await window.memoriaAPI.request(`/memories/${id}`, 'PATCH', { text: newValue });
         }
         await loadMemories();
       } catch (error) {
         console.error('Failed to save edit:', error);
+        showErrorBanner('Failed to save edit: ' + error.message);
       }
     }
 
@@ -230,8 +541,10 @@
         await window.memoriaAPI.request('/memories', 'POST', { text });
         memText.value = '';
         await loadMemories();
+        showSuccessBanner('Memory added successfully');
       } catch (error) {
         console.error('Failed to add memory:', error);
+        showErrorBanner('Failed to add memory: ' + error.message);
       }
     };
 
@@ -244,6 +557,8 @@
     memClearBtn.onclick = async () => {
       memSearch.value = '';
       memCurrentQuery = '';
+      memCurrentTags = [];
+      memCurrentPeople = [];
       memCurrentPage = 0;
       await loadMemories();
     };
@@ -261,9 +576,47 @@
     };
 
     // Allow enter key to search
-    memSearch.onkeypress = (e) => {
+    memSearch.onkeydown = (e) => {
       if (e.key === 'Enter') {
+        e.preventDefault();
         memSearchBtn.click();
+      }
+    };
+
+    // Bulk operations event handlers
+    selectAll.onchange = selectAllMemories;
+    bulkDeselectBtn.onclick = deselectAllMemories;
+    
+    bulkDeleteBtn.onclick = async () => {
+      if (selectedMemories.size === 0) return;
+      
+      const count = selectedMemories.size;
+      if (!confirm(`Delete ${count} selected memories? This cannot be undone.`)) {
+        return;
+      }
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const memoryId of selectedMemories) {
+        try {
+          await window.memoriaAPI.request(`/memories/${memoryId}`, 'DELETE');
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to delete memory ${memoryId}:`, error);
+          errorCount++;
+        }
+      }
+      
+      // Clear selections and reload
+      selectedMemories.clear();
+      await loadMemories();
+      
+      // Show results
+      if (errorCount === 0) {
+        showSuccessBanner(`Successfully deleted ${successCount} memories`);
+      } else {
+        showErrorBanner(`Deleted ${successCount} memories, ${errorCount} failed`);
       }
     };
 
@@ -272,6 +625,12 @@
 
     // Initialize dictation after page load
     document.addEventListener('DOMContentLoaded', initializeDictation);
+
+    // Global functions for onclick handlers
+    window.removeTagFilter = removeTagFilter;
+    window.removePeopleFilter = removePeopleFilter;
+    window.addTagFilter = addTagFilter;
+    window.addPeopleFilter = addPeopleFilter;
   </script>
 </body>
 </html>

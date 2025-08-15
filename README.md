@@ -103,6 +103,72 @@ Each memory and task has a trash icon (🗑️) button for deletion:
 - API returns 404 for unknown IDs; UI shows "Item already gone" message
 - Works with keyboard navigation (Tab to focus, Enter/Space to activate)
 
+### Bulk Operations for Memories
+
+The enhanced Memories page supports bulk operations:
+- **Bulk selection**: Check individual memory checkboxes or use "Select All"
+- **Bulk delete**: Select multiple memories and use "Delete Selected" for efficient cleanup
+- **Confirmation dialog**: Bulk deletes require confirmation to prevent accidents
+
+## Enhanced Memories Page
+
+The dedicated Memories page (`/web/memories.html`) provides advanced filtering and management:
+
+### Search and Filtering
+- **Text search**: Search across memory content and tags using the search box (supports Enter key)
+- **Tag filtering**: Click on tag chips (#hashtag) to filter memories by specific tags  
+- **People filtering**: Click on people chips (@person) to filter memories by mentioned people
+- **Combined filtering**: Use multiple filters together (search + tags + people)
+- **CSV filtering**: Backend supports comma-separated values for tags and people parameters
+
+### Interactive Features
+- **Filter chips**: Clickable chips show available tags and people from current results
+- **Active filters**: Applied filters show with × buttons to remove them
+- **Clear all**: "Clear" button removes all active filters and search terms
+
+### Inline Editing
+- **Edit in place**: Click the ✏️ edit button to edit memory text inline
+- **Keyboard shortcuts**: Save with Enter, cancel with Escape, or use ✓/✕ buttons
+- **Auto-tag update**: Tags are automatically extracted and updated when memory text changes
+- **Visual feedback**: Editing state is clearly indicated with border highlighting
+
+### Pagination
+- **Server-side pagination**: Efficient handling of large memory collections
+- **Page info**: Shows current page, total pages, and total item count
+- **Navigation**: Previous/Next buttons with proper disable states
+
+### Error Handling
+- **Success banners**: Green banners confirm successful operations (add, edit, delete)
+- **Error banners**: Red banners show error messages for failed operations
+- **Auto-dismiss**: Banners automatically disappear after a few seconds
+
+### API Enhancements
+
+The `/memories` endpoint now supports enhanced filtering:
+```bash
+# Search with text query
+GET /memories?q=search+term&limit=20&offset=0
+
+# Filter by tags (CSV)
+GET /memories?tags=ai,project&limit=20&offset=0
+
+# Filter by people (CSV)  
+GET /memories?people=john,mary&limit=20&offset=0
+
+# Combined filtering
+GET /memories?q=meeting&tags=work&people=john&limit=20&offset=0
+```
+
+Response format:
+```json
+{
+  "items": [...],
+  "total": 42
+}
+```
+
+**Backward Compatibility**: When no filtering parameters are provided, the endpoint returns just the items array as before.
+
 ## Web-based voice dictation
 
 The web interface includes a built-in voice dictation feature:

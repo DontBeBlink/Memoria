@@ -65,20 +65,48 @@ def add_task(title: str, due: Optional[str]) -> Dict[str, Any]:
   conn.close()
   return dict(row)
 
-def list_memories(limit: int = 100, offset: int = 0, query: Optional[str] = None):
+def list_memories(limit: int = 100, offset: int = 0, query: Optional[str] = None, tags: Optional[List[str]] = None, people: Optional[List[str]] = None):
   conn = _connect()
   
   # Build the SQL query based on search parameters
   base_sql = "SELECT * FROM memories"
   count_sql = "SELECT COUNT(*) FROM memories"
   params = []
+  where_clauses = []
   
+  # Add text search filter
   if query:
-    where_clause = " WHERE text LIKE ? OR tags LIKE ?"
-    base_sql += where_clause
-    count_sql += where_clause
+    where_clauses.append("(text LIKE ? OR tags LIKE ?)")
     search_term = f"%{query}%"
     params.extend([search_term, search_term])
+  
+  # Add tags filter (any of the specified tags)
+  if tags:
+    tag_conditions = []
+    for tag in tags:
+      # Ensure tag starts with # if it doesn't already
+      tag_to_search = tag if tag.startswith('#') else f"#{tag}"
+      tag_conditions.append("tags LIKE ?")
+      params.append(f"%{tag_to_search}%")
+    if tag_conditions:
+      where_clauses.append(f"({' OR '.join(tag_conditions)})")
+  
+  # Add people filter (any of the specified people)
+  if people:
+    people_conditions = []
+    for person in people:
+      # Ensure person starts with @ if it doesn't already
+      person_to_search = person if person.startswith('@') else f"@{person}"
+      people_conditions.append("tags LIKE ?")
+      params.append(f"%{person_to_search}%")
+    if people_conditions:
+      where_clauses.append(f"({' OR '.join(people_conditions)})")
+  
+  # Combine where clauses
+  if where_clauses:
+    where_clause = " WHERE " + " AND ".join(where_clauses)
+    base_sql += where_clause
+    count_sql += where_clause
   
   # Add ordering and pagination
   base_sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
@@ -88,7 +116,7 @@ def list_memories(limit: int = 100, offset: int = 0, query: Optional[str] = None
   rows = conn.execute(base_sql, params).fetchall()
   
   # Get the total count (for pagination)
-  count_params = params[:-2] if query else []  # Remove limit and offset from count query
+  count_params = params[:-2]  # Remove limit and offset from count query
   total = conn.execute(count_sql, count_params).fetchone()[0]
   
   conn.close()
