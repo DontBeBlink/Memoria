@@ -126,7 +126,7 @@
     .timeline-content {
       position: relative;
       border-left: 2px solid #374151;
-      min-height: 1098px; /* 18 hours * (60px + 1px border) = 18 * 61px = 1098px */
+      min-height: calc(18 * 61px); /* Dynamic calculation based on hour slots */
     }
     .time-slot {
       height: 60px;
@@ -136,6 +136,9 @@
       align-items: center;
       padding: 4px 8px;
       transition: background-color 0.2s;
+    }
+    .time-slot[data-hour] {
+      /* Add data-hour attribute for DOM measurement */
     }
     .time-slot:hover {
       background-color: #1f2937;
@@ -154,6 +157,9 @@
       align-items: center;
       justify-content: flex-end;
       border-bottom: 1px solid #374151;
+    }
+    .time-label[data-hour] {
+      /* Add data-hour attribute for DOM measurement */
     }
     .timeline-task {
       position: absolute;
@@ -926,6 +932,43 @@
       return li;
     }
 
+    // Timeline measurement system - no magic numbers
+    let timelineMetrics = null;
+    
+    function measureTimelineMetrics() {
+      // Find the first hour slot in the timeline to measure actual rendered dimensions
+      const firstSlot = document.querySelector('.time-slot[data-hour]');
+      if (!firstSlot) {
+        console.error('No timeline slots found for measurement');
+        return { pxPerMinute: 1, slotHeight: 61 }; // Fallback
+      }
+      
+      // Measure actual rendered height including borders
+      const rect = firstSlot.getBoundingClientRect();
+      const computedStyle = getComputedStyle(firstSlot);
+      const borderBottom = parseFloat(computedStyle.borderBottomWidth) || 0;
+      
+      // Full slot height including border
+      const actualSlotHeight = rect.height + borderBottom;
+      
+      // Calculate pixels per minute from measured hour slot
+      const pxPerMinute = actualSlotHeight / 60;
+      
+      console.log(`Timeline metrics measured: ${actualSlotHeight}px per hour, ${pxPerMinute}px per minute`);
+      
+      return {
+        pxPerMinute,
+        slotHeight: actualSlotHeight
+      };
+    }
+    
+    function getTimelineMetrics() {
+      if (!timelineMetrics) {
+        timelineMetrics = measureTimelineMetrics();
+      }
+      return timelineMetrics;
+    }
+    
     // Timeline drag and drop functions
     function createTimelineTask(task) {
       const taskElement = document.createElement('div');
@@ -933,11 +976,10 @@
       taskElement.draggable = true;
       taskElement.dataset.taskId = task.id;
       
-      // Set height based on duration with accurate slot scaling
+      // Set height based on duration using measured metrics
       const duration = task.duration || 30; // Default 30 minutes if no duration
-      // Each hour slot is exactly 61px (60px content + 1px border)
-      // Scale duration: 60 minutes = 61px total slot height
-      const heightPixels = Math.max((duration / 60) * 61, 20); // Minimum 20px height for visibility
+      const metrics = getTimelineMetrics();
+      const heightPixels = Math.max(duration * metrics.pxPerMinute, 20); // Minimum 20px height for visibility
       taskElement.style.height = `${heightPixels}px`;
       taskElement.style.maxHeight = `${heightPixels}px`;
       
@@ -1058,19 +1100,28 @@
       for (let hour = 6; hour <= 23; hour++) {
         const timeLabel = document.createElement('div');
         timeLabel.className = 'time-label';
+        timeLabel.dataset.hour = hour; // Add data-hour for measurement
         timeLabel.textContent = `${hour % 12 === 0 ? 12 : hour % 12}${hour < 12 ? 'AM' : 'PM'}`;
         hoursColumn.appendChild(timeLabel);
         
         const timeSlot = document.createElement('div');
         timeSlot.className = 'time-slot';
-        timeSlot.dataset.hour = hour;
+        timeSlot.dataset.hour = hour; // Add data-hour for measurement
         timeSlot.addEventListener('dragover', handleDragOver);
         timeSlot.addEventListener('drop', handleDrop);
         timeSlot.addEventListener('dragleave', handleDragLeave);
         contentColumn.appendChild(timeSlot);
       }
       
-      // Position tasks in timeline with pixel-perfect accuracy
+      // Add to DOM first so we can measure
+      timelineContainer.appendChild(hoursColumn);
+      timelineContainer.appendChild(contentColumn);
+      dayContent.appendChild(timelineContainer);
+      
+      // Reset metrics cache so it gets remeasured
+      timelineMetrics = null;
+      
+      // Position tasks in timeline with DOM-measured precision
       for (const task of tasks) {
         if (task.due) {
           const taskDate = new Date(task.due);
@@ -1080,18 +1131,15 @@
           if (hour >= 6 && hour <= 23) {
             const taskElement = createTimelineTask(task);
             
-            // Calculate precise position based on time slot boundaries
-            // Timeline starts at 6 AM, so we need to offset from that
-            const slotIndex = hour - 6;
+            // Calculate precise position using measured metrics
+            const metrics = getTimelineMetrics();
+            const slotIndex = hour - 6; // Timeline starts at 6 AM
             
-            // Each time slot is exactly 61px tall (60px content + 1px bottom border)
-            const SLOT_HEIGHT = 61;
-            
-            // Position calculation:
-            // - Start with the top of the hour slot (slotIndex * SLOT_HEIGHT)
-            // - Add minute offset within that hour (minutes/60 * SLOT_HEIGHT)
-            const hourTop = slotIndex * SLOT_HEIGHT;
-            const minuteOffset = (minutes / 60) * SLOT_HEIGHT;
+            // Position calculation using measured slot height:
+            // - Start with the top of the hour slot (slotIndex * measured slot height)
+            // - Add minute offset within that hour (minutes * pxPerMinute)
+            const hourTop = slotIndex * metrics.slotHeight;
+            const minuteOffset = minutes * metrics.pxPerMinute;
             const preciseTotalTop = hourTop + minuteOffset;
             
             // Apply positioning
@@ -1105,10 +1153,6 @@
           }
         }
       }
-      
-      timelineContainer.appendChild(hoursColumn);
-      timelineContainer.appendChild(contentColumn);
-      dayContent.appendChild(timelineContainer);
     }
     
     function renderListView(tasks) {
