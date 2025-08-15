@@ -605,8 +605,9 @@
     function getWeekStart(date) {
       const result = new Date(date);
       const day = result.getDay();
-      const diff = result.getDate() - day;
-      return new Date(result.setDate(diff));
+      // Adjust for Monday start: Monday = 0, Tuesday = 1, ..., Sunday = 6
+      const daysToSubtract = day === 0 ? 6 : day - 1; // If Sunday, go back 6 days, otherwise go back (day - 1)
+      return new Date(result.setDate(result.getDate() - daysToSubtract));
     }
     
     function getWeekEnd(date) {
@@ -1144,12 +1145,14 @@
       
       // Group tasks by day
       const dayGroups = {};
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       
       for (let i = 0; i < 7; i++) {
         const day = addDays(weekStart, i);
         const dayKey = formatDate(day);
-        const dayName = dayNames[day.getDay()];
+        // Adjust day index for Monday start (Monday = 0, Tuesday = 1, ..., Sunday = 6)
+        const adjustedDayIndex = (day.getDay() + 6) % 7; // Convert Sunday=0 to Sunday=6, Monday=1 to Monday=0, etc.
+        const dayName = dayNames[adjustedDayIndex];
         const displayName = `${dayName} ${day.getDate()}`;
         dayGroups[displayName] = { date: dayKey, tasks: [] };
       }
@@ -1208,7 +1211,10 @@
       const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
       const startDate = new Date(firstDay);
-      startDate.setDate(startDate.getDate() - firstDay.getDay()); // Start from Sunday
+      // Start from Monday instead of Sunday
+      const dayOfWeek = firstDay.getDay();
+      const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday (0), go back 6 days, otherwise go back (dayOfWeek - 1)
+      startDate.setDate(startDate.getDate() - daysToSubtract);
       
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + 41); // 6 weeks * 7 days
@@ -1222,7 +1228,10 @@
       const tasksByDate = {};
       for (const task of tasks) {
         if (task.due) {
-          const dateKey = formatDate(new Date(task.due));
+          // Fix date parsing to avoid timezone offset issues
+          const taskDate = new Date(task.due);
+          // Use the date components directly to avoid timezone conversion
+          const dateKey = formatDate(new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate()));
           if (!tasksByDate[dateKey]) tasksByDate[dateKey] = [];
           tasksByDate[dateKey].push(task);
         }
@@ -1243,8 +1252,8 @@
       const calendar = document.createElement('div');
       calendar.className = 'calendar-grid';
       
-      // Add day headers
-      const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      // Add day headers - start with Monday
+      const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       for (const header of dayHeaders) {
         const headerElement = document.createElement('div');
         headerElement.className = 'calendar-header';
