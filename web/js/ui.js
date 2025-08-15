@@ -7,7 +7,7 @@ class MemoriaUI {
   constructor() {
     this.currentPage = 'hub'; // default
     this.pages = {
-      'hub': { title: 'Hub', href: '/index.html' },
+      'hub': { title: 'Hub', href: '/web/index.html' },
       'memories': { title: 'Memories', href: '/web/memories.html' },
       'agenda': { title: 'Agenda', href: '/web/agenda.html' },
       'backup': { title: 'Backup', href: '/web/backup.html' },
@@ -40,7 +40,7 @@ class MemoriaUI {
       <h1>
         ${this.currentPage === 'hub' 
           ? 'Memoria Hub' 
-          : `<a href="/" style="color: inherit; text-decoration: none;">Memoria Hub</a> / ${currentPageInfo.title}`
+          : `<a href="${this.pages.hub.href}" style="color: #60a5fa; text-decoration: none; padding: 4px 8px; border-radius: 4px; background: rgba(37, 99, 235, 0.1); border: 1px solid rgba(37, 99, 235, 0.3);">Memoria Hub</a> / ${currentPageInfo.title}`
         }
       </h1>
       <div class="nav-links" style="display: flex; gap: 8px; align-items: center; margin-right: auto;">
