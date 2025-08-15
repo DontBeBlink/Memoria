@@ -55,639 +55,284 @@
     .status-message { background:#1f2937; color:#e5e7eb; padding:8px 12px; border-radius:6px; font-size:12px; display:none; margin-left:8px; }
     .error-banner { background:#dc2626; color:white; padding:8px 16px; display:none; border-radius:6px; margin:8px 0; font-size:14px; }
     .error-banner.show { display:block; }
+    .nav-links a { color:#60a5fa; text-decoration:none; padding:8px 12px; border:1px solid #374151; border-radius:6px; font-size:14px; }
+    .nav-links a:hover { text-decoration:underline; }
+    .overview-card { border:1px solid #374151; border-radius:8px; padding:16px; background:#0f172a; margin-bottom:16px; }
+    .overview-stats { display:flex; gap:16px; justify-content:space-around; text-align:center; }
+    .stat-item { flex:1; }
+    .stat-number { font-size:24px; font-weight:bold; color:#60a5fa; }
+    .stat-label { font-size:12px; color:#9ca3af; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Memoria Hub</h1>
-    <div class="row">
-      <a href="web/backup.html" style="color:#60a5fa; text-decoration:none; padding:8px 12px; border:1px solid #374151; border-radius:6px; font-size:14px;">Backup</a>
-      <input id="pass" type="text" placeholder="Passcode" style="max-width:160px;"/>
-      <button id="savePass">Set</button>
-      <button id="micButton" class="mic-button" title="Hold to record voice memo">🎤</button>
-      <span id="micStatus" class="status-message"></span>
-      <button id="install" style="display:none;">Install App</button>
-      <button id="refresh">Refresh</button>
-    </div>
-  </header>
-  <div id="authWarning" class="auth-warning">
-    <strong>Unauthorized!</strong> Please set your Passcode to match the AUTH_TOKEN from your .env file.
-  </div>
+  <header id="header"></header>
+  <div id="authWarningContainer"></div>
   <div id="errorBanner" class="error-banner">
     <strong>Error:</strong> <span id="errorMessage"></span>
   </div>
   <main>
-    <section class="grid">
-      <div>
-        <div class="sec-title"><h3>Memoria</h3><span class="muted">Capture a memory (@name, #tags)</span></div>
-        <form id="memForm">
-          <input id="memText" type="text" placeholder="@Sirine is a cutie pie"/>
-          <button type="submit">Save</button>
-        </form>
-        <div class="row" style="margin-bottom:8px;">
-          <input id="memSearch" type="text" placeholder="Search memories..." style="max-width:200px;"/>
-          <button id="memSearchBtn">Search</button>
-          <button id="memClearBtn">Clear</button>
-        </div>
-        <ul id="memList"></ul>
-        <div id="memPagination" class="row" style="justify-content:center; margin-top:8px; display:none;">
-          <button id="memPrevBtn">Previous</button>
-          <span id="memPageInfo" style="margin:0 12px;"></span>
-          <button id="memNextBtn">Next</button>
-        </div>
-      </div>
-      <div>
-        <div class="sec-title"><h3>Promemoria</h3><span class="muted">Natural language times (e.g., tomorrow 9am, in 7 hours)</span></div>
-        <form id="taskForm">
-          <input id="taskText" type="text" placeholder="Start working on project (Monday 9am / in 1 hour) #low"/>
-          <button type="submit">Save</button>
-        </form>
-        <ul id="taskList"></ul>
-      </div>
-    </section>
     <section>
-      <div class="sec-title"><h3>Agenda</h3><span class="muted">Quick plan</span></div>
-      <div class="row" style="margin-bottom:8px;">
-        <select id="energy">
-          <option value="low">Low</option>
-          <option value="med" selected>Medium</option>
-          <option value="high">High</option>
-        </select>
-        <button id="suggest">Suggest</button>
+      <div class="overview-card">
+        <h3>🏠 Welcome to Memoria Hub</h3>
+        <p class="muted">Your personal memory and task management system</p>
+        
+        <div class="overview-stats">
+          <div class="stat-item">
+            <div class="stat-number" id="memoryCount">-</div>
+            <div class="stat-label">Memories</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="taskCount">-</div>
+            <div class="stat-label">Open Tasks</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="dueCount">-</div>
+            <div class="stat-label">Due Today</div>
+          </div>
+        </div>
       </div>
-      <ul id="planList"></ul>
     </section>
-    <p class="muted">Tip: Add this page to your Home Screen for app-like use. Notifications: use ntfy to get alerts on your phone when tasks are due.</p>
+
+    <section>
+      <div class="sec-title">
+        <h3>🚀 Quick Actions</h3>
+        <span class="muted">Get started</span>
+      </div>
+      <div class="grid">
+        <div class="overview-card">
+          <h4>📝 Add Memory</h4>
+          <form id="quickMemForm">
+            <input id="quickMemText" type="text" placeholder="What happened today? (@name, #tags)" />
+            <button type="submit">Save</button>
+          </form>
+          <p class="muted">Quickly capture a memory or go to <a href="web/memories.html">Memories</a> for full features</p>
+        </div>
+        
+        <div class="overview-card">
+          <h4>✅ Add Task</h4>
+          <form id="quickTaskForm">
+            <input id="quickTaskText" type="text" placeholder="What needs to be done? (Monday 9am, #tags)" />
+            <button type="submit">Save</button>
+          </form>
+          <p class="muted">Quickly add a task or go to <a href="web/agenda.html">Agenda</a> for planning</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-title">
+        <h3>📋 Recent Activity</h3>
+        <span class="muted">Latest items</span>
+      </div>
+      <div class="grid">
+        <div>
+          <h4>Recent Memories</h4>
+          <ul id="recentMemories"></ul>
+          <p class="muted"><a href="web/memories.html">View all memories →</a></p>
+        </div>
+        
+        <div>
+          <h4>Upcoming Tasks</h4>
+          <ul id="upcomingTasks"></ul>
+          <p class="muted"><a href="web/agenda.html">View full agenda →</a></p>
+        </div>
+      </div>
+    </section>
+    
+    <p class="muted">Tip: Add this page to your Home Screen for app-like use. Navigate using the menu above to access different sections.</p>
   </main>
-  <script>
-    const API = (window.location.origin);
-    const passEl = document.getElementById('pass');
-    const savePassBtn = document.getElementById('savePass');
-    const memForm = document.getElementById('memForm');
-    const memText = document.getElementById('memText');
-    const memList = document.getElementById('memList');
-    const memSearch = document.getElementById('memSearch');
-    const memSearchBtn = document.getElementById('memSearchBtn');
-    const memClearBtn = document.getElementById('memClearBtn');
-    const memPagination = document.getElementById('memPagination');
-    const memPrevBtn = document.getElementById('memPrevBtn');
-    const memNextBtn = document.getElementById('memNextBtn');
-    const memPageInfo = document.getElementById('memPageInfo');
-    const taskForm = document.getElementById('taskForm');
-    const taskText = document.getElementById('taskText');
-    const taskList = document.getElementById('taskList');
-    const refreshBtn = document.getElementById('refresh');
-    const energySel = document.getElementById('energy');
-    const suggestBtn = document.getElementById('suggest');
-    const planList = document.getElementById('planList');
 
-  let PASS = localStorage.getItem('memoria_pass') || '';
-  // Expose PASS globally so `web/js/dictation.js` can read it (it checks window.PASS)
-  window.PASS = PASS;
-  passEl.value = PASS;
-    const authWarning = document.getElementById('authWarning');
-
-    // Pagination state
-    let memCurrentPage = 0;
-    let memCurrentQuery = '';
-    const memPerPage = 50;
-
-  savePassBtn.onclick = () => { PASS = passEl.value.trim(); window.PASS = PASS; localStorage.setItem('memoria_pass', PASS); alert('Passcode set locally'); };
-
-    async function api(path, method='GET', body=null) {
-      const res = await fetch(API + path, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(PASS ? {'x-auth-token': PASS} : {})
-        },
-        body: body ? JSON.stringify(body) : null
-      });
-      
-      if (res.status === 401) {
-        authWarning.classList.add('show');
-        throw new Error('Unauthorized');
-      } else {
-        authWarning.classList.remove('show');
-      }
-      
-      if (!res.ok) throw new Error(await res.text());
-      
-      // Handle 204 No Content responses
-      if (res.status === 204) {
-        return null;
-      }
-      
-      return res.json();
-    }
-
-    async function loadMemories() {
-      const params = new URLSearchParams();
-      if (memCurrentQuery) {
-        params.append('q', memCurrentQuery);
-      }
-      params.append('limit', memPerPage.toString());
-      params.append('offset', (memCurrentPage * memPerPage).toString());
-      
-      const result = await api(`/memories?${params.toString()}`);
-      
-      if (result && Array.isArray(result)) {
-        // Backward compatibility: no pagination info
-        renderList(memList, result, 'memory');
-        memPagination.style.display = 'none';
-      } else {
-        // New format with pagination
-        renderList(memList, result.items, 'memory');
-        updateMemoryPagination(result.total);
-      }
-    }
-
-    function updateMemoryPagination(total) {
-      const totalPages = Math.ceil(total / memPerPage);
-      const currentPageNum = memCurrentPage + 1;
-      
-      if (totalPages <= 1) {
-        memPagination.style.display = 'none';
-        return;
-      }
-      
-      memPagination.style.display = 'flex';
-      memPageInfo.textContent = `Page ${currentPageNum} of ${totalPages} (${total} total)`;
-      memPrevBtn.disabled = memCurrentPage === 0;
-      memNextBtn.disabled = memCurrentPage >= totalPages - 1;
-    }
-
-    async function deleteItem(type, id, listElement) {
-      const itemName = type === 'memory' ? 'memory' : 'task';
-      if (!confirm(`Delete this ${itemName}?`)) {
-        return;
-      }
-      
-      try {
-        const endpoint = type === 'memory' ? `/memories/${id}` : `/tasks/${id}`;
-        await api(endpoint, 'DELETE');
-        
-        // Optimistically remove from UI
-        listElement.remove();
-        
-        // Show success message
-        showMessage(`${itemName.charAt(0).toUpperCase() + itemName.slice(1)} deleted successfully`, 'success');
-      } catch (error) {
-        // Handle different error scenarios
-        if (error.message.includes('Not found')) {
-          showMessage('Item already gone', 'info');
-          listElement.remove(); // Remove from UI anyway since it doesn't exist
-        } else {
-          showMessage(`Failed to delete ${itemName}: ${error.message}`, 'error');
-        }
-      }
-    }
-
-    function showMessage(text, type = 'info') {
-      // Create or reuse message element
-      let messageEl = document.getElementById('messageBar');
-      if (!messageEl) {
-        messageEl = document.createElement('div');
-        messageEl.id = 'messageBar';
-        messageEl.style.cssText = `
-          position: fixed;
-          top: 60px;
-          left: 50%;
-          transform: translateX(-50%);
-          padding: 12px 16px;
-          border-radius: 8px;
-          color: white;
-          font-weight: bold;
-          z-index: 1000;
-          max-width: 400px;
-          text-align: center;
-        `;
-        document.body.appendChild(messageEl);
-      }
-      
-      // Set message and style based on type
-      messageEl.textContent = text;
-      if (type === 'success') {
-        messageEl.style.background = '#059669';
-      } else if (type === 'error') {
-        messageEl.style.background = '#dc2626';
-      } else {
-        messageEl.style.background = '#2563eb';
-      }
-      
-      messageEl.style.display = 'block';
-      
-      // Auto-hide after 3 seconds
-      setTimeout(() => {
-        messageEl.style.display = 'none';
-      }, 3000);
-    }
-
-    async function loadAll() {
-      const [_, tasks] = await Promise.all([
-        loadMemories(),
-        api('/tasks?open_only=true')
-      ]);
-      renderTasks(tasks);
-    }
-
-    function renderList(el, items, type) {
-      el.innerHTML = '';
-      for (const it of items) {
-        const li = document.createElement('li');
-        li.dataset.id = it.id;
-        li.dataset.type = type;
-        
-        const left = document.createElement('div'); 
-        left.className = 'row';
-        left.style.flex = '1';
-        
-        const contentContainer = document.createElement('div');
-        contentContainer.style.flex = '1';
-        
-        const title = document.createElement('div'); 
-        title.textContent = (it.text || it.title);
-        title.className = 'content-text';
-        
-        const tags = document.createElement('div'); 
-        tags.className = 'tags'; 
-        tags.textContent = it.tags || '';
-        
-        contentContainer.append(title, tags);
-        
-        const right = document.createElement('div'); right.className = 'row';
-        const deleteBtn = document.createElement('button'); 
-        deleteBtn.className = 'pill'; 
-        deleteBtn.textContent = '🗑️';
-        deleteBtn.setAttribute('aria-label', `Delete ${type}`);
-        deleteBtn.onclick = async () => await deleteItem(type, it.id, li);
-        right.append(deleteBtn);
-        
-        
-        const editIcon = document.createElement('button');
-        editIcon.className = 'edit-icon';
-        editIcon.innerHTML = '✏️';
-        editIcon.title = 'Edit';
-        editIcon.onclick = () => startEdit(li, type, it);
-        
-        left.append(contentContainer, editIcon);
-        li.append(left, right);
-        el.appendChild(li);
-      }
-    }
-
-    function renderTasks(tasks) {
-      taskList.innerHTML = '';
-      for (const t of tasks) {
-        const li = document.createElement('li');
-        li.dataset.id = t.id;
-        li.dataset.type = 'task';
-        
-        const left = document.createElement('div'); 
-        left.className = 'row';
-        left.style.flex = '1';
-        
-        const contentContainer = document.createElement('div');
-        contentContainer.style.flex = '1';
-        
-        const title = document.createElement('div'); 
-        title.textContent = t.title;
-        title.className = 'content-text';
-        
-        const meta = document.createElement('div'); 
-        meta.className = 'tags'; 
-        meta.textContent = (t.due ? new Date(t.due).toLocaleString() : '') + (t.tags?' '+t.tags:'');
-        
-        contentContainer.append(title, meta);
-        
-        const editIcon = document.createElement('button');
-        editIcon.className = 'edit-icon';
-        editIcon.innerHTML = '✏️';
-        editIcon.title = 'Edit';
-        editIcon.onclick = () => startEdit(li, 'task', t);
-        
-        left.append(contentContainer, editIcon);
-        
-        const right = document.createElement('div'); 
-        right.className = 'row';
-        const doneBtn = document.createElement('button'); 
-        doneBtn.className = 'pill'; 
-        doneBtn.textContent = 'Done';
-        doneBtn.onclick = async () => { 
-          await api(`/tasks/${t.id}/done?done=true`, 'POST'); 
-          await loadAll(); 
-        };
-        const deleteBtn = document.createElement('button'); 
-        deleteBtn.className = 'pill'; 
-        deleteBtn.textContent = '🗑️';
-        deleteBtn.setAttribute('aria-label', 'Delete task');
-        deleteBtn.onclick = async () => await deleteItem('task', t.id, li);
-        right.append(doneBtn, deleteBtn);
-        
-        li.append(left, right);
-        taskList.appendChild(li);
-      }
-    }
-
-    function startEdit(li, type, item) {
-      if (li.classList.contains('editing')) return;
-      
-      li.classList.add('editing');
-      const contentText = li.querySelector('.content-text');
-      const originalText = contentText.textContent;
-      
-      // Store original data for cancel
-      li.dataset.originalText = originalText;
-      
-      // Create input field
-      const input = document.createElement('input');
-      input.className = 'inline-input';
-      input.type = 'text';
-      input.value = originalText;
-      
-      // Create action buttons
-      const actions = document.createElement('div');
-      actions.className = 'edit-actions';
-      
-      const saveBtn = document.createElement('button');
-      saveBtn.className = 'save-btn';
-      saveBtn.textContent = '✓';
-      saveBtn.title = 'Save';
-      saveBtn.onclick = () => saveEdit(li, type, item.id, input.value);
-      
-      const cancelBtn = document.createElement('button');
-      cancelBtn.className = 'cancel-btn';
-      cancelBtn.textContent = '✕';
-      cancelBtn.title = 'Cancel';
-      cancelBtn.onclick = () => cancelEdit(li);
-      
-      actions.append(saveBtn, cancelBtn);
-      
-      // Replace content with input and actions
-      contentText.style.display = 'none';
-      contentText.parentNode.insertBefore(input, contentText);
-      contentText.parentNode.insertBefore(actions, contentText.nextSibling);
-      
-      // Hide edit icon
-      li.querySelector('.edit-icon').style.display = 'none';
-      
-      // Focus input and select text
-      input.focus();
-      input.select();
-      
-      // Handle Enter key
-      input.onkeydown = (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          saveEdit(li, type, item.id, input.value);
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          cancelEdit(li);
-        }
-      };
-      
-      // Mark as unsaved when typing
-      input.oninput = () => {
-        if (input.value !== originalText) {
-          li.classList.add('unsaved');
-        } else {
-          li.classList.remove('unsaved');
-        }
-      };
-    }
-    
-    async function saveEdit(li, type, id, newText) {
-      if (!newText.trim()) {
-        showError(li, 'Text cannot be empty');
-        return;
-      }
-      
-      try {
-        const endpoint = type === 'memory' ? `/memories/${id}` : `/tasks/${id}`;
-        const field = type === 'memory' ? 'text' : 'title';
-        const payload = { [field]: newText.trim() };
-        
-        await api(endpoint, 'PATCH', payload);
-        finishEdit(li, true);
-        await loadAll();
-      } catch (error) {
-        showError(li, error.message);
-      }
-    }
-    
-    function cancelEdit(li) {
-      finishEdit(li, false);
-    }
-    
-    function finishEdit(li, success) {
-      li.classList.remove('editing', 'unsaved');
-      
-      // Remove input and actions
-      const input = li.querySelector('.inline-input');
-      const actions = li.querySelector('.edit-actions');
-      const errorMsg = li.querySelector('.error-message');
-      
-      if (input) input.remove();
-      if (actions) actions.remove();
-      if (errorMsg) errorMsg.remove();
-      
-      // Show content and edit icon again
-      const contentText = li.querySelector('.content-text');
-      const editIcon = li.querySelector('.edit-icon');
-      
-      contentText.style.display = '';
-      editIcon.style.display = '';
-      
-      // Clean up data attributes
-      delete li.dataset.originalText;
-    }
-    
-    function showError(li, message) {
-      // Remove existing error
-      const existingError = li.querySelector('.error-message');
-      if (existingError) existingError.remove();
-      
-      // Add new error message
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'error-message';
-      errorDiv.textContent = message;
-      
-      const actions = li.querySelector('.edit-actions');
-      actions.parentNode.insertBefore(errorDiv, actions.nextSibling);
-    }
-
-    memForm.onsubmit = async (e) => {
-      e.preventDefault();
-      const text = memText.value.trim(); if (!text) return;
-      await api('/memories', 'POST', { text });
-      memText.value = '';
-      // Reset to first page when adding new memory
-      memCurrentPage = 0;
-      await loadAll();
-    };
-
-    taskForm.onsubmit = async (e) => {
-      e.preventDefault();
-      const text = taskText.value.trim(); if (!text) return;
-      await api('/capture', 'POST', { text });
-      taskText.value = '';
-      await loadAll();
-    };
-
-    refreshBtn.onclick = loadAll;
-
-    // Memory search and pagination handlers
-    memSearchBtn.onclick = async () => {
-      memCurrentQuery = memSearch.value.trim();
-      memCurrentPage = 0;
-      await loadMemories();
-    };
-
-    memClearBtn.onclick = async () => {
-      memSearch.value = '';
-      memCurrentQuery = '';
-      memCurrentPage = 0;
-      await loadMemories();
-    };
-
-    memPrevBtn.onclick = async () => {
-      if (memCurrentPage > 0) {
-        memCurrentPage--;
-        await loadMemories();
-      }
-    };
-
-    memNextBtn.onclick = async () => {
-      memCurrentPage++;
-      await loadMemories();
-    };
-
-    // Allow enter key to search
-    memSearch.onkeypress = (e) => {
-      if (e.key === 'Enter') {
-        memSearchBtn.click();
-      }
-    };
-
-    suggestBtn.onclick = async () => {
-      const tasks = await api('/tasks?open_only=true');
-      const energy = energySel.value;
-      const scored = tasks.map(t => {
-        let score = 0;
-        if ((t.tags||'').includes('#ydt')) score += 3;
-        if (t.due) {
-          const d = new Date(t.due);
-          const hours = (d - new Date())/36e5;
-          if (hours < 0) score += 3;
-          else if (hours < 24) score += 2;
-          else if (hours < 72) score += 1;
-        }
-        const energyTag = (t.tags||'').match(/#(low|med|high)/)?.[1] || 'med';
-        return { t, score, energyTag };
-      });
-      const filtered = scored.filter(o => o.energyTag === energy || (energy==='low' && o.energyTag==='med'));
-      filtered.sort((a,b)=> b.score - a.score);
-      const items = filtered.slice(0,6).map(o=>o.t);
-      planList.innerHTML = '';
-      for (const t of items) {
-        const li = document.createElement('li');
-        li.dataset.id = t.id;
-        li.dataset.type = 'task';
-        
-        const left = document.createElement('div'); 
-        left.className='row';
-        left.style.flex = '1';
-        
-        const contentContainer = document.createElement('div');
-        contentContainer.style.flex = '1';
-        
-        const title = document.createElement('div'); 
-        title.textContent = t.title;
-        title.className = 'content-text';
-        
-        const meta = document.createElement('div'); 
-        meta.className='tags'; 
-        meta.textContent = (t.due? new Date(t.due).toLocaleString(): '') + (t.tags?' '+t.tags:'');
-        
-        contentContainer.append(title, meta);
-        
-        const editIcon = document.createElement('button');
-        editIcon.className = 'edit-icon';
-        editIcon.innerHTML = '✏️';
-        editIcon.title = 'Edit';
-        editIcon.onclick = () => startEdit(li, 'task', t);
-        
-        left.append(contentContainer, editIcon);
-        
-        const right = document.createElement('div'); 
-        right.className='row';
-        const doneBtn = document.createElement('button'); 
-        doneBtn.className='pill'; 
-        doneBtn.textContent='Done';
-        doneBtn.onclick = async ()=>{ 
-          await api(`/tasks/${t.id}/done?done=true`, 'POST'); 
-          await loadAll(); 
-          suggestBtn.click(); 
-        };
-        const deleteBtn = document.createElement('button'); 
-        deleteBtn.className = 'pill'; 
-        deleteBtn.textContent = '🗑️';
-        deleteBtn.setAttribute('aria-label', 'Delete task');
-        deleteBtn.onclick = async () => { await deleteItem('task', t.id, li); suggestBtn.click(); };
-        right.append(doneBtn, deleteBtn);
-        li.append(left, right);
-        planList.appendChild(li);
-      }
-    };
-
-    // PWA install prompt
-    let deferredPrompt = null;
-    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.getElementById('install').style.display = 'inline-block'; });
-    document.getElementById('install').onclick = async () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      document.getElementById('install').style.display = 'none';
-    };
-
-    // Service worker
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
-
-    loadAll().catch(err => alert('Error: ' + err.message));
-  </script>
+  <script src="web/js/api.js"></script>
+  <script src="web/js/ui.js"></script>
   <script src="web/js/dictation.js"></script>
   <script>
-    // Initialize voice dictation
-    const voiceDictation = new VoiceDictation();
-    const errorBanner = document.getElementById('errorBanner');
-    const errorMessage = document.getElementById('errorMessage');
+    // Set current page for navigation
+    window.memoriaUI.setCurrentPage('hub');
+    
+    // Render header and auth warning
+    const header = document.getElementById('header');
+    const authContainer = document.getElementById('authWarningContainer');
+    
+    window.memoriaUI.renderHeader(header, {
+      showMicButton: true,
+      showInstallButton: true,
+      onMicButtonClick: initializeDictation,
+      onInstallClick: handleInstall
+    });
+    
+    const authWarning = window.memoriaUI.renderAuthWarning(authContainer);
 
-    function showError(message) {
-      errorMessage.textContent = message;
-      errorBanner.classList.add('show');
-      setTimeout(() => {
-        errorBanner.classList.remove('show');
-      }, 5000);
+    // Dashboard elements
+    const memoryCount = document.getElementById('memoryCount');
+    const taskCount = document.getElementById('taskCount');
+    const dueCount = document.getElementById('dueCount');
+    const quickMemForm = document.getElementById('quickMemForm');
+    const quickMemText = document.getElementById('quickMemText');
+    const quickTaskForm = document.getElementById('quickTaskForm');
+    const quickTaskText = document.getElementById('quickTaskText');
+    const recentMemories = document.getElementById('recentMemories');
+    const upcomingTasks = document.getElementById('upcomingTasks');
+
+    // Voice dictation initialization
+    function initializeDictation() {
+      const voiceDict = new VoiceDictation();
+      voiceDict.init('micButton', 'micStatus', 
+        (transcription) => {
+          quickMemText.value = transcription;
+          quickMemForm.dispatchEvent(new Event('submit'));
+        },
+        (error) => console.error('Dictation error:', error)
+      );
     }
 
-    voiceDictation.init(
-      'micButton',
-      'micStatus',
-      async (transcribedText) => {
-        // On successful transcription, create a memory
-        try {
-          await api('/memories', 'POST', { text: transcribedText });
-          await loadAll(); // Refresh the memory list
-        } catch (err) {
-          showError(`Failed to save memory: ${err.message}`);
-        }
-      },
-      (errorMsg) => {
-        // On error
-        showError(errorMsg);
+    // PWA install handling
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installBtn = document.getElementById('install');
+      if (installBtn) installBtn.style.display = 'block';
+    });
+
+    function handleInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          deferredPrompt = null;
+          const installBtn = document.getElementById('install');
+          if (installBtn) installBtn.style.display = 'none';
+        });
       }
-    );
+    }
+
+    // Dashboard functions
+    async function loadDashboardStats() {
+      try {
+        // Load memory count (latest 1 with total count)
+        const memParams = new URLSearchParams({ limit: 1, offset: 0 });
+        const memories = await window.memoriaAPI.request(`/memories?${memParams}`);
+        
+        // For now, estimate based on recent memories - in a real app, you'd want a count endpoint
+        memoryCount.textContent = memories.length > 0 ? '10+' : '0';
+        
+        // Load open tasks
+        const tasks = await window.memoriaAPI.request('/tasks?open_only=true');
+        taskCount.textContent = tasks.length;
+        
+        // Count due today
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        const todayDue = tasks.filter(t => t.due && new Date(t.due) <= today).length;
+        dueCount.textContent = todayDue;
+        
+        return { memories, tasks };
+      } catch (error) {
+        console.error('Failed to load dashboard stats:', error);
+        memoryCount.textContent = '?';
+        taskCount.textContent = '?';
+        dueCount.textContent = '?';
+        return { memories: [], tasks: [] };
+      }
+    }
+
+    async function loadRecentActivity() {
+      try {
+        // Load recent memories
+        const memParams = new URLSearchParams({ limit: 3, offset: 0 });
+        const memories = await window.memoriaAPI.request(`/memories?${memParams}`);
+        
+        recentMemories.innerHTML = '';
+        if (memories.length === 0) {
+          recentMemories.innerHTML = '<li style="border:none; padding:8px; background:transparent;">No memories yet</li>';
+        } else {
+          memories.forEach(memory => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <div style="flex:1;">
+                <div>${memory.text}</div>
+                <div class="tags">${memory.tags || ''}</div>
+              </div>
+            `;
+            recentMemories.appendChild(li);
+          });
+        }
+        
+        // Load upcoming tasks
+        const tasks = await window.memoriaAPI.request('/tasks?open_only=true');
+        const sortedTasks = tasks
+          .filter(t => t.due)
+          .sort((a, b) => new Date(a.due) - new Date(b.due))
+          .slice(0, 3);
+        
+        upcomingTasks.innerHTML = '';
+        if (sortedTasks.length === 0) {
+          upcomingTasks.innerHTML = '<li style="border:none; padding:8px; background:transparent;">No upcoming tasks</li>';
+        } else {
+          sortedTasks.forEach(task => {
+            const li = document.createElement('li');
+            const dueDate = new Date(task.due);
+            li.innerHTML = `
+              <div style="flex:1;">
+                <div>${task.title}</div>
+                <div class="tags">${dueDate.toLocaleDateString()} ${task.tags || ''}</div>
+              </div>
+            `;
+            upcomingTasks.appendChild(li);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load recent activity:', error);
+      }
+    }
+
+    // Form handlers
+    quickMemForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const text = quickMemText.value.trim();
+      if (!text) return;
+      
+      try {
+        await window.memoriaAPI.request('/memories', 'POST', { text });
+        quickMemText.value = '';
+        loadDashboardStats();
+        loadRecentActivity();
+      } catch (error) {
+        console.error('Failed to add memory:', error);
+        alert('Failed to add memory: ' + error.message);
+      }
+    };
+
+    quickTaskForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const title = quickTaskText.value.trim();
+      if (!title) return;
+      
+      try {
+        await window.memoriaAPI.request('/tasks', 'POST', { title });
+        quickTaskText.value = '';
+        loadDashboardStats();
+        loadRecentActivity();
+      } catch (error) {
+        console.error('Failed to add task:', error);
+        alert('Failed to add task: ' + error.message);
+      }
+    };
+
+    // Initialize dashboard
+    async function initDashboard() {
+      await loadDashboardStats();
+      await loadRecentActivity();
+    }
+
+    // Register service worker
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
+
+    // Load dashboard data
+    initDashboard();
+
+    // Initialize dictation after page load
+    document.addEventListener('DOMContentLoaded', initializeDictation);
   </script>
 </body>
 </html>

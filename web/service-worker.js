@@ -1,7 +1,14 @@
-const CACHE = 'memoria-v1';
+const CACHE = 'memoria-v2';
 const ASSETS = [
   './',
   './index.html',
+  './web/memories.html',
+  './web/agenda.html',
+  './web/backup.html',
+  './web/settings.html',
+  './web/js/api.js',
+  './web/js/ui.js',
+  './web/js/dictation.js',
   './manifest.json',
   './service-worker.js'
 ];

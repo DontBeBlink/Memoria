@@ -34,19 +34,13 @@
     .stat { background:#1f2937; padding:8px 12px; border-radius:6px; }
     .stat-label { font-size:12px; color:#9ca3af; }
     .stat-value { font-size:16px; font-weight:bold; }
+    .nav-links a { color:#60a5fa; text-decoration:none; padding:8px 12px; border:1px solid #374151; border-radius:6px; font-size:14px; }
+    .nav-links a:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
-  <header>
-    <h1><a href="/">Memoria Hub</a> / Backup</h1>
-    <div class="row">
-      <input id="pass" type="text" placeholder="Passcode" style="max-width:160px; padding:8px; border-radius:6px; border:1px solid #374151; background:#0f172a; color:#e5e7eb;"/>
-      <button id="savePass">Set</button>
-    </div>
-  </header>
-  <div id="authWarning" class="auth-warning">
-    <strong>Unauthorized!</strong> Please set your Passcode to match the AUTH_TOKEN from your .env file.
-  </div>
+  <header id="header"></header>
+  <div id="authWarningContainer"></div>
   <main>
     <section>
       <div class="card">
@@ -72,45 +66,23 @@
     </section>
   </main>
 
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
   <script>
-    const API = window.location.origin;
-    const passEl = document.getElementById('pass');
-    const savePassBtn = document.getElementById('savePass');
+    // Set current page for navigation
+    window.memoriaUI.setCurrentPage('backup');
+    
+    // Render header and auth warning
+    const header = document.getElementById('header');
+    const authContainer = document.getElementById('authWarningContainer');
+    
+    window.memoriaUI.renderHeader(header);
+    const authWarning = window.memoriaUI.renderAuthWarning(authContainer);
+
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const importFile = document.getElementById('importFile');
     const overwriteFlag = document.getElementById('overwriteFlag');
-    const authWarning = document.getElementById('authWarning');
-
-    let PASS = localStorage.getItem('memoria_pass') || '';
-    passEl.value = PASS;
-
-    savePassBtn.onclick = () => {
-      PASS = passEl.value.trim();
-      localStorage.setItem('memoria_pass', PASS);
-      alert('Passcode set locally');
-    };
-
-    async function api(path, method='GET', body=null) {
-      const res = await fetch(API + path, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(PASS ? {'x-auth-token': PASS} : {})
-        },
-        body: body ? JSON.stringify(body) : null
-      });
-      
-      if (res.status === 401) {
-        authWarning.classList.add('show');
-        throw new Error('Unauthorized');
-      } else {
-        authWarning.classList.remove('show');
-      }
-      
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    }
 
     // Export functionality
     exportBtn.onclick = async () => {
@@ -120,7 +92,7 @@
       exportBtn.textContent = '⏳ Exporting...';
 
       try {
-        const data = await api('/export');
+        const data = await window.memoriaAPI.request('/export');
         
         // Create and download file
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
@@ -170,7 +142,7 @@
         const data = JSON.parse(text);
         
         const overwrite = overwriteFlag.checked;
-        const result = await api(`/import?overwrite=${overwrite}`, 'POST', data);
+        const result = await window.memoriaAPI.request(`/import?overwrite=${overwrite}`, 'POST', data);
 
         const totalMemories = result.memories.inserted + result.memories.updated + result.memories.skipped + result.memories.failed;
         const totalTasks = result.tasks.inserted + result.tasks.updated + result.tasks.skipped + result.tasks.failed;

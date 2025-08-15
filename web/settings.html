@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Memoria Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="../manifest.json" />
+  <link rel="apple-touch-icon" href="../icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b1220; color:#e5e7eb; }
+    header { padding:12px 16px; background:#111827; position:sticky; top:0; display:flex; align-items:center; gap:12px; }
+    h1 { margin:0; font-size:18px; }
+    main { padding:16px; max-width:840px; margin: 0 auto; }
+    section { margin-bottom: 24px; }
+    .card { border:1px solid #374151; border-radius:8px; padding:20px; background:#0f172a; }
+    button { padding:12px 20px; border:0; border-radius:8px; background:#2563eb; color:white; font-size:14px; cursor:pointer; }
+    button:hover { background:#1d4ed8; }
+    button:disabled { background:#374151; cursor:not-allowed; }
+    input[type=text], input[type=url] { 
+      width: 100%; padding:10px; border-radius:8px; border:1px solid #374151; 
+      background:#0f172a; color:#e5e7eb; margin:8px 0; 
+    }
+    input[type=checkbox] { margin-right:8px; }
+    .muted { color:#9ca3af; font-size:14px; margin-top:8px; }
+    .row { display:flex; gap:8px; align-items:center; }
+    a { color:#60a5fa; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .auth-warning { background:#dc2626; color:white; padding:12px 16px; display:none; border-left:4px solid #b91c1c; }
+    .auth-warning.show { display:block; }
+    .nav-links a { color:#60a5fa; text-decoration:none; padding:8px 12px; border:1px solid #374151; border-radius:6px; font-size:14px; }
+    .nav-links a:hover { text-decoration:underline; }
+    .setting-item { margin-bottom: 16px; }
+    .setting-label { font-weight: bold; margin-bottom: 4px; display: block; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+  <div id="authWarningContainer"></div>
+  <main>
+    <section>
+      <div class="card">
+        <h3>⚙️ Application Settings</h3>
+        <p class="muted">Configure your Memoria experience</p>
+        
+        <div class="setting-item">
+          <label class="setting-label">Passcode</label>
+          <p class="muted">Your passcode is managed in the header above. It must match the AUTH_TOKEN from your server's .env file.</p>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">Notifications</label>
+          <div class="row">
+            <input type="checkbox" id="notificationsEnabled" />
+            <label for="notificationsEnabled">Enable browser notifications</label>
+          </div>
+          <p class="muted">Get notified when tasks are due (requires permission)</p>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">Voice Recognition</label>
+          <div class="row">
+            <input type="checkbox" id="voiceEnabled" checked />
+            <label for="voiceEnabled">Enable voice memo recording</label>
+          </div>
+          <p class="muted">Use the microphone button to record voice memos that get transcribed to text</p>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">Default Energy Level</label>
+          <select id="defaultEnergy" style="padding:8px; border-radius:6px; border:1px solid #374151; background:#0f172a; color:#e5e7eb;">
+            <option value="low">Low</option>
+            <option value="med" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+          <p class="muted">Default energy level for agenda suggestions</p>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">Theme</label>
+          <p class="muted">Currently using dark theme. Light theme support coming soon.</p>
+        </div>
+      </div>
+    </section>
+    
+    <section>
+      <div class="card">
+        <h3>📱 PWA Settings</h3>
+        <p class="muted">Progressive Web App features</p>
+        
+        <div class="setting-item">
+          <button id="installBtn" style="display:none;">📲 Install App</button>
+          <p id="installStatus" class="muted">Add Memoria to your home screen for a native app experience.</p>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">Cache Status</label>
+          <button id="clearCacheBtn">🗑️ Clear Cache</button>
+          <p class="muted">Clear cached data and force reload from server</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <h3>ℹ️ About</h3>
+        <p class="muted">Memoria - Your personal memory and task management system</p>
+        
+        <div class="setting-item">
+          <label class="setting-label">Version</label>
+          <p class="muted">v1.0.0</p>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">Storage</label>
+          <p class="muted">Data is stored on your server and cached locally for offline access.</p>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">Backup</label>
+          <p class="muted">Visit the <a href="backup.html">Backup page</a> to export or import your data.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    // Set current page for navigation
+    window.memoriaUI.setCurrentPage('settings');
+    
+    // Render header and auth warning
+    const header = document.getElementById('header');
+    const authContainer = document.getElementById('authWarningContainer');
+    
+    window.memoriaUI.renderHeader(header, {
+      showInstallButton: true,
+      onInstallClick: handleInstall
+    });
+    
+    const authWarning = window.memoriaUI.renderAuthWarning(authContainer);
+
+    // Initialize settings elements
+    const notificationsEnabled = document.getElementById('notificationsEnabled');
+    const voiceEnabled = document.getElementById('voiceEnabled');
+    const defaultEnergy = document.getElementById('defaultEnergy');
+    const installBtn = document.getElementById('installBtn');
+    const installStatus = document.getElementById('installStatus');
+    const clearCacheBtn = document.getElementById('clearCacheBtn');
+
+    // Load saved settings
+    function loadSettings() {
+      notificationsEnabled.checked = localStorage.getItem('memoria_notifications') === 'true';
+      voiceEnabled.checked = localStorage.getItem('memoria_voice') !== 'false'; // default true
+      defaultEnergy.value = localStorage.getItem('memoria_default_energy') || 'med';
+    }
+
+    // Save settings
+    function saveSettings() {
+      localStorage.setItem('memoria_notifications', notificationsEnabled.checked);
+      localStorage.setItem('memoria_voice', voiceEnabled.checked);
+      localStorage.setItem('memoria_default_energy', defaultEnergy.value);
+    }
+
+    // Event handlers
+    notificationsEnabled.onchange = () => {
+      if (notificationsEnabled.checked) {
+        // Request notification permission
+        if ('Notification' in window) {
+          Notification.requestPermission().then(permission => {
+            if (permission !== 'granted') {
+              notificationsEnabled.checked = false;
+            }
+            saveSettings();
+          });
+        } else {
+          alert('Notifications are not supported in this browser');
+          notificationsEnabled.checked = false;
+        }
+      } else {
+        saveSettings();
+      }
+    };
+
+    voiceEnabled.onchange = saveSettings;
+    defaultEnergy.onchange = saveSettings;
+
+    // PWA install handling
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'block';
+      installStatus.textContent = 'Ready to install!';
+    });
+
+    function handleInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            installStatus.textContent = 'App installed successfully!';
+          }
+          deferredPrompt = null;
+          installBtn.style.display = 'none';
+        });
+      }
+    }
+
+    installBtn.onclick = handleInstall;
+
+    // Clear cache
+    clearCacheBtn.onclick = async () => {
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        alert('Cache cleared! The page will reload.');
+        window.location.reload();
+      } else {
+        alert('Cache clearing is not supported in this browser');
+      }
+    };
+
+    // Check if already installed
+    window.addEventListener('appinstalled', () => {
+      installStatus.textContent = 'App is installed!';
+      installBtn.style.display = 'none';
+    });
+
+    // Load initial settings
+    loadSettings();
+  </script>
+</body>
+</html>
