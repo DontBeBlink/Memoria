@@ -45,6 +45,35 @@
     .sec-title { display:flex; justify-content:space-between; align-items:center; }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
     @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+    
+    /* Agenda-specific styles */
+    .agenda-tabs { display:flex; gap:8px; margin-bottom:16px; }
+    .agenda-tab { 
+      padding:8px 16px; border:1px solid #374151; border-radius:6px; background:#0f172a; 
+      color:#9ca3af; cursor:pointer; transition:all 0.2s;
+    }
+    .agenda-tab.active { background:#2563eb; color:white; border-color:#2563eb; }
+    .agenda-tab:hover:not(.active) { background:#374151; color:#e5e7eb; }
+    
+    .agenda-view { display:none; }
+    .agenda-view.active { display:block; }
+    
+    .time-group { margin-bottom:16px; }
+    .time-group h4 { 
+      margin:0 0 8px 0; color:#60a5fa; font-size:14px; font-weight:500;
+      padding:4px 8px; background:#1f2937; border-radius:4px; display:inline-block;
+    }
+    
+    .quick-actions { display:flex; gap:4px; margin-left:8px; }
+    .quick-action { 
+      padding:2px 6px; font-size:11px; border-radius:4px; 
+      background:#374151; color:#e5e7eb; border:none; cursor:pointer;
+    }
+    .quick-action:hover { background:#4b5563; }
+    .quick-action.done { background:#059669; }
+    .quick-action.reschedule { background:#f59e0b; }
+    
+    .agenda-container { max-width:1000px; margin:0 auto; }
     .auth-warning { background:#dc2626; color:white; padding:12px 16px; display:none; border-left:4px solid #b91c1c; }
     .auth-warning.show { display:block; }
     .nav-links a { color:#60a5fa; text-decoration:none; padding:8px 12px; border:1px solid #374151; border-radius:6px; font-size:14px; }
@@ -55,24 +84,52 @@
   <header id="header"></header>
   <div id="authWarningContainer"></div>
   <main>
-    <div class="grid">
-      <section>
-        <div class="sec-title">
-          <h3>📋 Tasks</h3>
-          <span class="muted">Things to do</span>
-        </div>
+    <div class="agenda-container">
+      <!-- Add Task Form -->
+      <section style="margin-bottom:20px;">
         <form id="taskForm">
-          <input id="taskText" type="text" placeholder="Add a task..." required />
+          <input id="taskText" type="text" placeholder="Add a task... (try 'Meeting Mon 9a' or 'Call client in 2h')" required />
           <button type="submit">Add</button>
         </form>
-        <ul id="taskList"></ul>
-        <button id="refresh" style="margin-top:8px;">Refresh</button>
       </section>
-      
-      <section>
+
+      <!-- View Tabs -->
+      <div class="agenda-tabs">
+        <div class="agenda-tab active" data-view="day">📅 Day</div>
+        <div class="agenda-tab" data-view="week">📆 Week</div>
+      </div>
+
+      <!-- Day View -->
+      <div id="dayView" class="agenda-view active">
+        <div class="sec-title" style="margin-bottom:16px;">
+          <h3 id="dayTitle">Today</h3>
+          <div class="row">
+            <button id="prevDay">&lt;</button>
+            <button id="nextDay">&gt;</button>
+            <button id="todayBtn">Today</button>
+          </div>
+        </div>
+        <div id="dayContent"></div>
+      </div>
+
+      <!-- Week View -->
+      <div id="weekView" class="agenda-view">
+        <div class="sec-title" style="margin-bottom:16px;">
+          <h3 id="weekTitle">This Week</h3>
+          <div class="row">
+            <button id="prevWeek">&lt;</button>
+            <button id="nextWeek">&gt;</button>
+            <button id="thisWeekBtn">This Week</button>
+          </div>
+        </div>
+        <div id="weekContent"></div>
+      </div>
+
+      <!-- Quick Plan Section (preserved) -->
+      <section style="margin-top:32px; padding-top:16px; border-top:1px solid #374151;">
         <div class="sec-title">
-          <h3>🎯 Daily Plan</h3>
-          <span class="muted">Quick plan</span>
+          <h3>🎯 Quick Plan</h3>
+          <span class="muted">AI suggestions based on energy</span>
         </div>
         <div class="row" style="margin-bottom:8px;">
           <select id="energy">
@@ -104,99 +161,362 @@
     // Initialize page elements
     const taskForm = document.getElementById('taskForm');
     const taskText = document.getElementById('taskText');
-    const taskList = document.getElementById('taskList');
-    const refreshBtn = document.getElementById('refresh');
     const energySel = document.getElementById('energy');
     const suggestBtn = document.getElementById('suggest');
     const planList = document.getElementById('planList');
 
-    async function loadAll() {
-      const tasks = await window.memoriaAPI.request('/tasks?open_only=true');
-      renderTasks(tasks);
+    // Tab elements
+    const tabs = document.querySelectorAll('.agenda-tab');
+    const dayView = document.getElementById('dayView');
+    const weekView = document.getElementById('weekView');
+    
+    // Navigation elements
+    const dayTitle = document.getElementById('dayTitle');
+    const weekTitle = document.getElementById('weekTitle');
+    const dayContent = document.getElementById('dayContent');
+    const weekContent = document.getElementById('weekContent');
+    
+    // Day navigation
+    const prevDayBtn = document.getElementById('prevDay');
+    const nextDayBtn = document.getElementById('nextDay');
+    const todayBtn = document.getElementById('todayBtn');
+    
+    // Week navigation
+    const prevWeekBtn = document.getElementById('prevWeek');
+    const nextWeekBtn = document.getElementById('nextWeek');
+    const thisWeekBtn = document.getElementById('thisWeekBtn');
+
+    // Current view state
+    let currentView = 'day';
+    let currentDate = new Date();
+    
+    // Utility functions
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+    
+    function formatDateTime(date) {
+      return date.toISOString();
+    }
+    
+    function addDays(date, days) {
+      const result = new Date(date);
+      result.setDate(result.getDate() + days);
+      return result;
+    }
+    
+    function addHours(date, hours) {
+      const result = new Date(date);
+      result.setTime(result.getTime() + (hours * 60 * 60 * 1000));
+      return result;
+    }
+    
+    function getWeekStart(date) {
+      const result = new Date(date);
+      const day = result.getDay();
+      const diff = result.getDate() - day;
+      return new Date(result.setDate(diff));
+    }
+    
+    function getWeekEnd(date) {
+      const weekStart = getWeekStart(date);
+      return addDays(weekStart, 6);
     }
 
-    function renderTasks(tasks) {
-      renderList(taskList, tasks, 'task');
-    }
-
-    function renderList(el, items, type) {
-      el.innerHTML = '';
-      for (const it of items) {
-        const li = document.createElement('li');
-        li.dataset.id = it.id;
-        li.dataset.type = type;
-        
-        const left = document.createElement('div'); 
-        left.className = 'row';
-        left.style.flex = '1';
-        
-        const contentContainer = document.createElement('div');
-        contentContainer.style.flex = '1';
-        
-        const title = document.createElement('div'); 
-        title.textContent = it.title;
-        title.className = 'content-text';
-        
-        const meta = document.createElement('div'); 
-        meta.className = 'tags'; 
-        meta.textContent = (it.due ? new Date(it.due).toLocaleString() : '') + (it.tags?' '+it.tags:'');
-        
-        contentContainer.append(title, meta);
-        
-        const editIcon = document.createElement('button');
-        editIcon.className = 'edit-icon';
-        editIcon.innerHTML = '✏️';
-        editIcon.title = 'Edit';
-        editIcon.onclick = () => startEdit(li, 'task', it);
-        
-        left.append(contentContainer, editIcon);
-        
-        const right = document.createElement('div'); 
-        right.className = 'row';
-        const doneBtn = document.createElement('button'); 
-        doneBtn.className = 'pill'; 
-        doneBtn.textContent = 'Done';
-        doneBtn.onclick = async () => { 
-          await window.memoriaAPI.request(`/tasks/${it.id}/done?done=true`, 'POST'); 
-          await loadAll(); 
-          suggestBtn.click(); 
-        };
-        const deleteBtn = document.createElement('button'); 
-        deleteBtn.className = 'pill'; 
-        deleteBtn.textContent = '🗑️';
-        deleteBtn.onclick = async () => { 
-          if (confirm('Delete this task?')) {
-            await window.memoriaAPI.request(`/tasks/${it.id}`, 'DELETE');
-            await loadAll();
-          }
-        };
-        right.append(doneBtn, deleteBtn);
-        
-        li.append(left, right);
-        el.append(li);
-      }
-    }
-
-    function startEdit(li, type, item) {
-      // Simple edit implementation
-      const newText = prompt('Edit:', item.title);
-      if (newText && newText !== item.title) {
-        saveEdit(li, type, item.id, newText);
-      }
-    }
-
-    async function saveEdit(li, type, id, newValue) {
+    // Task management functions
+    async function loadTasks(start, end) {
+      const params = new URLSearchParams({ open_only: 'true' });
+      if (start) params.append('start', start);
+      if (end) params.append('end', end);
+      
       try {
-        if (type === 'task') {
-          await window.memoriaAPI.request(`/tasks/${id}`, 'PUT', { title: newValue });
-        }
-        await loadAll();
+        return await window.memoriaAPI.request(`/tasks?${params}`);
       } catch (error) {
-        console.error('Failed to save edit:', error);
+        console.error('Failed to load tasks:', error);
+        return [];
+      }
+    }
+
+    async function rescheduleTask(taskId, newDue) {
+      try {
+        await window.memoriaAPI.request(`/tasks/${taskId}`, 'PATCH', { due: newDue });
+        await refreshCurrentView();
+      } catch (error) {
+        console.error('Failed to reschedule task:', error);
+      }
+    }
+
+    async function markTaskDone(taskId) {
+      try {
+        await window.memoriaAPI.request(`/tasks/${taskId}`, 'PATCH', { done: true });
+        await refreshCurrentView();
+      } catch (error) {
+        console.error('Failed to mark task done:', error);
+      }
+    }
+
+    // Quick action handlers
+    function createQuickActions(task) {
+      const actions = document.createElement('div');
+      actions.className = 'quick-actions';
+      
+      const doneBtn = document.createElement('button');
+      doneBtn.className = 'quick-action done';
+      doneBtn.textContent = 'Done';
+      doneBtn.onclick = () => markTaskDone(task.id);
+      
+      const oneHourBtn = document.createElement('button');
+      oneHourBtn.className = 'quick-action reschedule';
+      oneHourBtn.textContent = '+1h';
+      oneHourBtn.onclick = () => {
+        const newDue = task.due ? addHours(new Date(task.due), 1) : addHours(new Date(), 1);
+        rescheduleTask(task.id, formatDateTime(newDue));
+      };
+      
+      const oneDayBtn = document.createElement('button');
+      oneDayBtn.className = 'quick-action reschedule';
+      oneDayBtn.textContent = '+1d';
+      oneDayBtn.onclick = () => {
+        const newDue = task.due ? addDays(new Date(task.due), 1) : addDays(new Date(), 1);
+        rescheduleTask(task.id, formatDateTime(newDue));
+      };
+      
+      const nextWeekBtn = document.createElement('button');
+      nextWeekBtn.className = 'quick-action reschedule';
+      nextWeekBtn.textContent = 'Next week';
+      nextWeekBtn.onclick = () => {
+        const newDue = task.due ? addDays(new Date(task.due), 7) : addDays(new Date(), 7);
+        rescheduleTask(task.id, formatDateTime(newDue));
+      };
+      
+      const pickDateBtn = document.createElement('button');
+      pickDateBtn.className = 'quick-action reschedule';
+      pickDateBtn.textContent = 'Pick date';
+      pickDateBtn.onclick = () => {
+        const currentDue = task.due ? new Date(task.due).toISOString().slice(0, 16) : '';
+        const newDateTime = prompt('Enter new date and time (YYYY-MM-DDTHH:MM):', currentDue);
+        if (newDateTime) {
+          try {
+            const newDue = new Date(newDateTime);
+            rescheduleTask(task.id, formatDateTime(newDue));
+          } catch (error) {
+            alert('Invalid date format');
+          }
+        }
+      };
+      
+      actions.append(doneBtn, oneHourBtn, oneDayBtn, nextWeekBtn, pickDateBtn);
+      return actions;
+    }
+
+    // Render task item
+    function renderTask(task) {
+      const li = document.createElement('li');
+      
+      const left = document.createElement('div');
+      left.style.flex = '1';
+      
+      const title = document.createElement('div');
+      title.textContent = task.title;
+      title.className = 'content-text';
+      
+      const meta = document.createElement('div');
+      meta.className = 'tags';
+      const dueText = task.due ? new Date(task.due).toLocaleString() : 'No due date';
+      meta.textContent = dueText + (task.tags ? ' ' + task.tags : '');
+      
+      left.append(title, meta);
+      
+      const right = createQuickActions(task);
+      
+      li.append(left, right);
+      return li;
+    }
+
+    // Day view functions
+    async function renderDayView() {
+      const start = formatDate(currentDate) + 'T00:00:00';
+      const end = formatDate(currentDate) + 'T23:59:59';
+      const tasks = await loadTasks(start, end);
+      
+      dayTitle.textContent = currentDate.toDateString();
+      dayContent.innerHTML = '';
+      
+      // Group tasks by hour
+      const hourGroups = {};
+      const noTimeGroup = [];
+      
+      for (const task of tasks) {
+        if (task.due) {
+          const hour = new Date(task.due).getHours();
+          const hourKey = `${hour.toString().padStart(2, '0')}:00`;
+          if (!hourGroups[hourKey]) hourGroups[hourKey] = [];
+          hourGroups[hourKey].push(task);
+        } else {
+          noTimeGroup.push(task);
+        }
+      }
+      
+      // Render time groups
+      const sortedHours = Object.keys(hourGroups).sort();
+      for (const hour of sortedHours) {
+        const timeGroup = document.createElement('div');
+        timeGroup.className = 'time-group';
+        
+        const timeHeader = document.createElement('h4');
+        timeHeader.textContent = hour;
+        timeGroup.append(timeHeader);
+        
+        const taskList = document.createElement('ul');
+        for (const task of hourGroups[hour]) {
+          taskList.append(renderTask(task));
+        }
+        timeGroup.append(taskList);
+        dayContent.append(timeGroup);
+      }
+      
+      // Render tasks without specific time
+      if (noTimeGroup.length > 0) {
+        const timeGroup = document.createElement('div');
+        timeGroup.className = 'time-group';
+        
+        const timeHeader = document.createElement('h4');
+        timeHeader.textContent = 'No specific time';
+        timeGroup.append(timeHeader);
+        
+        const taskList = document.createElement('ul');
+        for (const task of noTimeGroup) {
+          taskList.append(renderTask(task));
+        }
+        timeGroup.append(taskList);
+        dayContent.append(timeGroup);
+      }
+      
+      if (tasks.length === 0) {
+        dayContent.innerHTML = '<p class="muted">No tasks for this day</p>';
+      }
+    }
+
+    // Week view functions
+    async function renderWeekView() {
+      const weekStart = getWeekStart(currentDate);
+      const weekEnd = getWeekEnd(currentDate);
+      
+      const start = formatDate(weekStart) + 'T00:00:00';
+      const end = formatDate(weekEnd) + 'T23:59:59';
+      const tasks = await loadTasks(start, end);
+      
+      const weekStartStr = weekStart.toLocaleDateString();
+      const weekEndStr = weekEnd.toLocaleDateString();
+      weekTitle.textContent = `${weekStartStr} - ${weekEndStr}`;
+      
+      weekContent.innerHTML = '';
+      
+      // Group tasks by day
+      const dayGroups = {};
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      
+      for (let i = 0; i < 7; i++) {
+        const day = addDays(weekStart, i);
+        const dayKey = formatDate(day);
+        const dayName = dayNames[day.getDay()];
+        const displayName = `${dayName} ${day.getDate()}`;
+        dayGroups[displayName] = { date: dayKey, tasks: [] };
+      }
+      
+      for (const task of tasks) {
+        if (task.due) {
+          const taskDate = formatDate(new Date(task.due));
+          const dayEntry = Object.entries(dayGroups).find(([_, data]) => data.date === taskDate);
+          if (dayEntry) {
+            dayEntry[1].tasks.push(task);
+          }
+        }
+      }
+      
+      // Render day groups
+      for (const [dayName, data] of Object.entries(dayGroups)) {
+        if (data.tasks.length > 0) {
+          const timeGroup = document.createElement('div');
+          timeGroup.className = 'time-group';
+          
+          const timeHeader = document.createElement('h4');
+          timeHeader.textContent = dayName;
+          timeGroup.append(timeHeader);
+          
+          const taskList = document.createElement('ul');
+          for (const task of data.tasks) {
+            taskList.append(renderTask(task));
+          }
+          timeGroup.append(taskList);
+          weekContent.append(timeGroup);
+        }
+      }
+      
+      if (tasks.length === 0) {
+        weekContent.innerHTML = '<p class="muted">No tasks for this week</p>';
+      }
+    }
+
+    // View management
+    function switchView(view) {
+      currentView = view;
+      
+      // Update tab states
+      tabs.forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.view === view);
+      });
+      
+      // Update view visibility
+      dayView.classList.toggle('active', view === 'day');
+      weekView.classList.toggle('active', view === 'week');
+      
+      refreshCurrentView();
+    }
+
+    async function refreshCurrentView() {
+      if (currentView === 'day') {
+        await renderDayView();
+      } else {
+        await renderWeekView();
       }
     }
 
     // Event handlers
+    tabs.forEach(tab => {
+      tab.onclick = () => switchView(tab.dataset.view);
+    });
+
+    prevDayBtn.onclick = () => {
+      currentDate = addDays(currentDate, -1);
+      renderDayView();
+    };
+
+    nextDayBtn.onclick = () => {
+      currentDate = addDays(currentDate, 1);
+      renderDayView();
+    };
+
+    todayBtn.onclick = () => {
+      currentDate = new Date();
+      renderDayView();
+    };
+
+    prevWeekBtn.onclick = () => {
+      currentDate = addDays(currentDate, -7);
+      renderWeekView();
+    };
+
+    nextWeekBtn.onclick = () => {
+      currentDate = addDays(currentDate, 7);
+      renderWeekView();
+    };
+
+    thisWeekBtn.onclick = () => {
+      currentDate = new Date();
+      renderWeekView();
+    };
+
     taskForm.onsubmit = async (e) => {
       e.preventDefault();
       const title = taskText.value.trim();
@@ -205,14 +525,13 @@
       try {
         await window.memoriaAPI.request('/tasks', 'POST', { title });
         taskText.value = '';
-        await loadAll();
+        await refreshCurrentView();
       } catch (error) {
         console.error('Failed to add task:', error);
       }
     };
 
-    refreshBtn.onclick = loadAll;
-
+    // Quick plan functionality (preserved)
     suggestBtn.onclick = async () => {
       const tasks = await window.memoriaAPI.request('/tasks?open_only=true');
       const energy = energySel.value;
@@ -252,8 +571,8 @@
       }
     };
 
-    // Load initial data
-    loadAll();
+    // Initialize
+    renderDayView();
   </script>
 </body>
 </html>
