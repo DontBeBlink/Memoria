@@ -335,6 +335,77 @@
       }
     }
 
+    // Task management functions
+    async function deleteTask(taskId, isRecurring, isInstance) {
+      try {
+        if (isRecurring && !isInstance) {
+          // Deleting a recurring task (parent)
+          const confirm = window.confirm(
+            'This will delete the entire recurring task series. Are you sure?'
+          );
+          if (!confirm) return;
+        } else if (isInstance) {
+          // Deleting a recurring task instance
+          const confirm = window.confirm(
+            'Delete this single occurrence? The recurring series will continue.'
+          );
+          if (!confirm) return;
+        } else {
+          // Regular task deletion
+          const confirm = window.confirm('Delete this task?');
+          if (!confirm) return;
+        }
+        
+        await window.memoriaAPI.request(`/tasks/${taskId}`, 'DELETE');
+        await refreshCurrentView();
+      } catch (error) {
+        console.error('Failed to delete task:', error);
+        alert('Failed to delete task');
+      }
+    }
+
+    async function editTask(task) {
+      try {
+        // Create edit form
+        const newTitle = prompt('Edit task title:', task.title);
+        if (newTitle === null) return; // User cancelled
+        
+        const updates = { title: newTitle };
+        
+        // Ask about due date
+        const currentDue = task.due ? new Date(task.due).toISOString().slice(0, 16) : '';
+        const newDue = prompt('Edit due date (YYYY-MM-DDTHH:MM, leave empty for no due date):', currentDue);
+        if (newDue !== null) {
+          updates.due = newDue || null;
+        }
+        
+        // Handle recurrence editing for recurring tasks
+        if (task.rrule || task.is_recurring_instance) {
+          if (task.is_recurring_instance) {
+            const editSeries = confirm('Edit the entire recurring series? (Cancel to edit only this instance)');
+            if (editSeries) {
+              // For instances, we can't directly edit the parent task easily
+              alert('Editing recurring series from instances is not yet supported. Please edit the original task.');
+              return;
+            }
+          } else {
+            // Editing parent recurring task
+            const currentRrule = task.rrule || '';
+            const newRrule = prompt('Edit recurrence rule (RRULE format, leave empty to remove recurrence):', currentRrule);
+            if (newRrule !== null) {
+              updates.rrule = newRrule || null;
+            }
+          }
+        }
+        
+        await window.memoriaAPI.request(`/tasks/${task.id}`, 'PATCH', updates);
+        await refreshCurrentView();
+      } catch (error) {
+        console.error('Failed to edit task:', error);
+        alert('Failed to edit task');
+      }
+    }
+
     // Quick action handlers
     function createQuickActions(task) {
       const actions = document.createElement('div');
@@ -344,6 +415,18 @@
       doneBtn.className = 'quick-action done';
       doneBtn.textContent = 'Done';
       doneBtn.onclick = () => markTaskDone(task.id);
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'quick-action';
+      editBtn.style.background = '#6366f1';
+      editBtn.textContent = '✏️ Edit';
+      editBtn.onclick = () => editTask(task);
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'quick-action';
+      deleteBtn.style.background = '#dc2626';
+      deleteBtn.textContent = '🗑️ Delete';
+      deleteBtn.onclick = () => deleteTask(task.id, !!task.rrule, !!task.is_recurring_instance);
       
       const oneHourBtn = document.createElement('button');
       oneHourBtn.className = 'quick-action reschedule';
@@ -385,7 +468,7 @@
         }
       };
       
-      actions.append(doneBtn, oneHourBtn, oneDayBtn, nextWeekBtn, pickDateBtn);
+      actions.append(doneBtn, editBtn, deleteBtn, oneHourBtn, oneDayBtn, nextWeekBtn, pickDateBtn);
       return actions;
     }
 

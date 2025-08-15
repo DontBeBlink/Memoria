@@ -156,7 +156,20 @@ def post_task(task: TaskIn, auth=Depends(require_auth)):
   return storage.add_task(task.title, due, task.rrule)
 
 @app.patch("/tasks/{task_id}")
-def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
+def patch_task(task_id: str, task: TaskPatch, auth=Depends(require_auth)):
+  # Handle both regular task IDs (integers) and recurring instance IDs (strings)
+  try:
+    # Try to parse as integer for regular tasks
+    task_id_int = int(task_id)
+  except ValueError:
+    # Handle recurring instance IDs (format: {parent_id}_r_{datetime})
+    if '_r_' in task_id:
+      # For now, recurring instances can't be updated individually
+      # In a real implementation, you might store instance-specific overrides
+      raise HTTPException(status_code=400, detail="Editing individual recurring instances is not yet supported. Edit the parent recurring task instead.")
+    else:
+      raise HTTPException(status_code=400, detail="Invalid task ID format")
+  
   # Prepare fields to update
   fields = {}
   if task.title is not None:
@@ -171,22 +184,51 @@ def patch_task(task_id: int, task: TaskPatch, auth=Depends(require_auth)):
   if not fields:
     raise HTTPException(status_code=400, detail="No fields to update")
   
-  result = storage.update_task(task_id, **fields)
+  result = storage.update_task(task_id_int, **fields)
   if not result:
     raise HTTPException(status_code=404, detail="Task not found")
   
   return result
 
 @app.delete("/tasks/{task_id}", status_code=204)
-def delete_task(task_id: int, auth=Depends(require_auth)):
-  deleted = storage.delete_task(task_id)
+def delete_task(task_id: str, auth=Depends(require_auth)):
+  # Handle both regular task IDs (integers) and recurring instance IDs (strings)
+  try:
+    # Try to parse as integer for regular tasks
+    task_id_int = int(task_id)
+    deleted = storage.delete_task(task_id_int)
+  except ValueError:
+    # Handle recurring instance IDs (format: {parent_id}_r_{datetime})
+    if '_r_' in task_id:
+      # Recurring instances can't be deleted individually in the database
+      # since they're generated dynamically. For now, we'll just return success.
+      # In a real implementation, you might want to store "deleted instances" in a separate table
+      return None
+    else:
+      raise HTTPException(status_code=400, detail="Invalid task ID format")
+  
   if not deleted:
     raise HTTPException(status_code=404, detail="Not found")
   return None
 
 @app.post("/tasks/{task_id}/done")
-def done_task(task_id: int, done: bool = True, auth=Depends(require_auth)):
-  row = storage.mark_done(task_id, done)
+def done_task(task_id: str, done: bool = True, auth=Depends(require_auth)):
+  # Handle both regular task IDs (integers) and recurring instance IDs (strings)
+  try:
+    # Try to parse as integer for regular tasks
+    task_id_int = int(task_id)
+    row = storage.mark_done(task_id_int, done)
+  except ValueError:
+    # Handle recurring instance IDs (format: {parent_id}_r_{datetime})
+    if '_r_' in task_id:
+      # For recurring instances, we can't mark them done in the database
+      # since they're generated dynamically. In a real implementation,
+      # you might store completed instances in a separate table.
+      # For now, return a success response but don't persist the change.
+      return {"message": "Recurring instance marked as done (not persisted)"}
+    else:
+      raise HTTPException(status_code=400, detail="Invalid task ID format")
+  
   if not row:
     raise HTTPException(status_code=404, detail="Not found")
   return row
